@@ -1,0 +1,3 @@
+[workspace]
+members = ["afw", "afw-ebpf", "afw-common", "xtask"]
+resolver = "2"

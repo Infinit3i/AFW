@@ -1,0 +1,13 @@
+[package]
+name = "afw-ebpf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aya-ebpf = "0.1"
+aya-log-ebpf = "0.1"
+afw-common = { path = "../afw-common" }
+
+[[bin]]
+name = "afw-ebpf"
+path = "src/main.rs"
