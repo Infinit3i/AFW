@@ -1,0 +1,49 @@
+# AFW - Application Firewall Configuration
+#
+# Base rules are always active. App rules are dynamic:
+# ports open when the app starts, close when it exits.
+
+[base]
+# Always-allowed outbound ports
+outbound = [
+    { port = 53,  protocol = "udp" },   # DNS
+    { port = 123, protocol = "udp" },   # NTP
+    { port = 443, protocol = "tcp" },   # HTTPS
+    { port = 80,  protocol = "tcp" },   # HTTP
+    { port = 68,  protocol = "udp" },   # DHCP
+]
+icmp = true
+loopback = true
+
+# Discord
+[[app]]
+name = "discord"
+binary = "Discord"
+enabled = true
+outbound = [
+    { port = 443, protocol = "tcp" },
+    { port = 80,  protocol = "tcp" },
+    { port = 50000, range_end = 50100, protocol = "udp" },
+]
+
+# Firefox
+[[app]]
+name = "firefox"
+binary = "firefox"
+enabled = true
+outbound = [
+    { port = 443, protocol = "tcp" },
+    { port = 80,  protocol = "tcp" },
+]
+
+# Steam
+[[app]]
+name = "steam"
+binary = "steam"
+enabled = true
+outbound = [
+    { port = 443, protocol = "tcp" },
+    { port = 80,  protocol = "tcp" },
+    { port = 27015, range_end = 27050, protocol = "udp" },
+    { port = 27015, range_end = 27050, protocol = "tcp" },
+]

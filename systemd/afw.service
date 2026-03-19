@@ -1,0 +1,34 @@
+[Unit]
+Description=AFW - Application Firewall
+Documentation=https://github.com/infinit3i/AFW
+After=network-pre.target
+Before=network.target
+Wants=network-pre.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/afw daemon
+ExecStopPost=/usr/bin/nft delete table inet afw
+Restart=on-failure
+RestartSec=5
+
+# Runtime directory for socket
+RuntimeDirectory=afw
+
+# Security hardening
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_BPF CAP_PERFMON CAP_SYS_RESOURCE
+AmbientCapabilities=CAP_NET_ADMIN CAP_BPF CAP_PERFMON CAP_SYS_RESOURCE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/afw
+ConfigurationDirectory=afw
+PrivateTmp=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afw
+
+[Install]
+WantedBy=multi-user.target
