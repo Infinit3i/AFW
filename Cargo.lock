@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "afw"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "afw-common",
  "anyhow",
@@ -24,14 +24,14 @@ dependencies = [
 
 [[package]]
 name = "afw-common"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aya",
 ]
 
 [[package]]
 name = "afw-ebpf"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "afw-common",
  "aya-ebpf",
@@ -1225,7 +1225,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap",
 ]

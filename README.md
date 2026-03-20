@@ -73,11 +73,22 @@ afw remove <name>       # Remove an app rule
 afw enable <name>       # Enable an app
 afw disable <name>      # Disable an app
 afw reload              # Reload config from disk
+afw pending             # Show blocked unknown apps
+sudo afw approve <bin>  # Permanently allow a blocked app
+sudo afw allow-once <bin>  # Temporarily allow (removed on exit)
+sudo afw deny <bin>     # Permanently block an app
 ```
 
-## Roadmap
+When an unknown app tries to connect, a desktop notification pops up with action buttons:
 
-See [.idea/README.md](.idea/README.md) for the feature roadmap, including interactive connection control (Little Snitch-style allow/deny prompts for unknown apps).
+```
+┌──────────────────────────────────────┐
+│ AFW Blocked: myapp                   │
+│ Blocked 5 connection attempt(s)      │
+│ Ports: 443/tcp, 8080/tcp             │
+│ [Always Allow] [Allow Once] [Deny]   │
+└──────────────────────────────────────┘
+```
 
 ## License
 

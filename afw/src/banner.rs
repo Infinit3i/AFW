@@ -7,7 +7,7 @@ pub const BANNER: &str = r#"
 ██║  ██║██║     ╚███╔███╔╝
 ╚═╝  ╚═╝╚═╝      ╚══╝╚══╝
   ╔═══════════════════════════════════╗
-  ║     Application Firewall v0.3    ║
+  ║     Application Firewall v0.4    ║
   ║     eBPF + nftables for Linux    ║
   ╚═══════════════════════════════════╝
 "#;
