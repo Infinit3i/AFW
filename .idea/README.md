@@ -12,11 +12,11 @@
 - [x] Daemon receives connection events alongside process events
 
 ### Phase 2: Unknown App Detection
-- [ ] When a connection event arrives for an app NOT in the config, flag it as "unknown"
-- [ ] Track unknown connection attempts: deduplicate by (comm, dest_port, protocol)
-- [ ] Aggregate ports per unknown app over a short time window (~5 seconds)
-- [ ] After the window, produce a summary: "app 'foo' tried 443/tcp, 80/tcp, 8443/tcp"
-- [ ] Since default policy is drop, the connection is already blocked — no action needed to deny
+- [x] When a connection event arrives for an app NOT in the config, flag it as "unknown"
+- [x] Track unknown connection attempts: deduplicate by (comm, dest_port, protocol)
+- [x] Aggregate ports per unknown app over a short time window (~5 seconds)
+- [x] After the window, produce a summary: "app 'foo' tried 443/tcp, 80/tcp, 8443/tcp"
+- [x] Since default policy is drop, the connection is already blocked — no action needed to deny
 
 ### Phase 3: Desktop Notification
 - [ ] Send notification via `notify-send` / D-Bus when unknown app is detected

@@ -81,6 +81,38 @@ pub struct UnknownConnection {
     pub last_seen: Instant,
     /// Number of connection attempts
     pub attempt_count: u32,
+    /// Whether a summary has been emitted after the aggregation window
+    pub summary_emitted: bool,
+}
+
+/// Duration to wait after first seeing an unknown app before emitting a summary.
+/// This aggregates all ports the app tries during this window into one report.
+const AGGREGATION_WINDOW_SECS: u64 = 5;
+
+/// Summary of an unknown app's connection attempts after the aggregation window
+#[derive(Debug, Clone)]
+pub struct UnknownConnectionSummary {
+    pub binary: String,
+    pub ports: Vec<(u16, String)>,
+    pub dest_addrs: Vec<String>,
+    pub attempt_count: u32,
+}
+
+impl UnknownConnectionSummary {
+    /// Generate a suggested `afw add` command for this app
+    pub fn suggested_command(&self) -> String {
+        let port_args: Vec<String> = self
+            .ports
+            .iter()
+            .map(|(port, proto)| format!("{}/{}", port, proto))
+            .collect();
+        format!(
+            "afw add {} {} {}",
+            self.binary.to_lowercase().replace(' ', "-"),
+            self.binary,
+            port_args.join(" ")
+        )
+    }
 }
 
 /// Runtime state tracking active processes and their firewall rules
@@ -221,6 +253,7 @@ impl AppState {
                 first_seen: now,
                 last_seen: now,
                 attempt_count: 0,
+                summary_emitted: false,
             });
 
         entry.ports.insert((dest_port, protocol.to_string()));
@@ -257,22 +290,85 @@ impl AppState {
         }
 
         out.push_str(&format!(
-            "Unknown apps with blocked connections: {}\n\n",
+            "Blocked unknown apps: {}\n\n",
             self.unknown_connections.len()
         ));
 
-        for (binary, conn) in &self.unknown_connections {
+        let mut entries: Vec<_> = self.unknown_connections.values().collect();
+        entries.sort_by(|a, b| b.attempt_count.cmp(&a.attempt_count));
+
+        for conn in entries {
             let elapsed = conn.first_seen.elapsed().as_secs();
+            let status = if conn.summary_emitted {
+                "aggregated"
+            } else {
+                "collecting..."
+            };
             out.push_str(&format!(
-                "  {} ({} attempts, first seen {}s ago)\n",
-                binary, conn.attempt_count, elapsed
+                "  {} ({} attempts, {}s ago) [{}]\n",
+                conn.binary, conn.attempt_count, elapsed, status
             ));
-            for (port, proto) in &conn.ports {
+
+            let mut ports: Vec<_> = conn.ports.iter().collect();
+            ports.sort_by_key(|(p, _)| *p);
+            for (port, proto) in &ports {
                 out.push_str(&format!("    -> {}/{}\n", port, proto));
             }
+
+            if !conn.dest_addrs.is_empty() {
+                let addrs: Vec<_> = conn.dest_addrs.iter().take(5).cloned().collect();
+                let suffix = if conn.dest_addrs.len() > 5 {
+                    format!(" (+{} more)", conn.dest_addrs.len() - 5)
+                } else {
+                    String::new()
+                };
+                out.push_str(&format!("    IPs: {}{}\n", addrs.join(", "), suffix));
+            }
+
+            // Suggest the add command
+            let port_args: Vec<String> = ports
+                .iter()
+                .map(|(port, proto)| format!("{}/{}", port, proto))
+                .collect();
+            if !port_args.is_empty() {
+                out.push_str(&format!(
+                    "    Suggest: afw add {} {} {}\n",
+                    conn.binary.to_lowercase().replace(' ', "-"),
+                    conn.binary,
+                    port_args.join(" ")
+                ));
+            }
+            out.push('\n');
         }
 
         out
+    }
+
+    /// Check aggregation windows and return summaries for apps ready to report.
+    /// An app is "ready" when it was first seen >= AGGREGATION_WINDOW_SECS ago
+    /// and hasn't had a summary emitted yet.
+    pub fn check_aggregation_windows(&mut self) -> Vec<UnknownConnectionSummary> {
+        let mut summaries = Vec::new();
+
+        for conn in self.unknown_connections.values_mut() {
+            if !conn.summary_emitted
+                && conn.first_seen.elapsed().as_secs() >= AGGREGATION_WINDOW_SECS
+            {
+                conn.summary_emitted = true;
+
+                let mut ports: Vec<(u16, String)> = conn.ports.iter().cloned().collect();
+                ports.sort_by_key(|(p, _)| *p);
+
+                summaries.push(UnknownConnectionSummary {
+                    binary: conn.binary.clone(),
+                    ports,
+                    dest_addrs: conn.dest_addrs.iter().cloned().collect(),
+                    attempt_count: conn.attempt_count,
+                });
+            }
+        }
+
+        summaries
     }
 
     /// Clear unknown connection tracking for a specific app (e.g. after approval)

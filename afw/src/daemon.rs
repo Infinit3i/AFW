@@ -57,6 +57,9 @@ pub async fn run() -> Result<()> {
 
     info!("AFW daemon ready. Monitoring process and connection events...");
 
+    // Periodic timer to check aggregation windows for unknown apps
+    let mut aggregation_tick = tokio::time::interval(std::time::Duration::from_secs(2));
+
     loop {
         tokio::select! {
             Some(event) = proc_rx.recv() => {
@@ -86,14 +89,31 @@ pub async fn run() -> Result<()> {
                 };
 
                 let mut state = state.lock().await;
-                let _is_new = state.handle_connection(
+                state.handle_connection(
                     &comm,
                     conn.dest_port,
                     protocol,
                     &dest_addr,
                 );
-
-                // Phase 3 will add desktop notifications here when _is_new is true
+            }
+            _ = aggregation_tick.tick() => {
+                let mut state = state.lock().await;
+                let summaries = state.check_aggregation_windows();
+                for summary in &summaries {
+                    info!(
+                        "BLOCKED: '{}' tried {} port(s): {} ({} attempts, {} destination(s))",
+                        summary.binary,
+                        summary.ports.len(),
+                        summary.ports.iter()
+                            .map(|(p, proto)| format!("{}/{}", p, proto))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        summary.attempt_count,
+                        summary.dest_addrs.len(),
+                    );
+                    info!("  To allow: {}", summary.suggested_command());
+                    // Phase 3 will send desktop notification here
+                }
             }
             _ = sigterm.recv() => {
                 info!("Received SIGTERM, shutting down...");
