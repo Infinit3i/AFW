@@ -37,8 +37,7 @@ pub async fn run() -> Result<()> {
 
     let state = Arc::new(Mutex::new(state));
 
-    // Bounded channel prevents OOM from extreme process churn (e.g. fork bombs)
-    let (tx, mut rx) = mpsc::channel(10_000);
+    let (tx, mut rx) = mpsc::unbounded_channel();
 
     let _bpf = ebpf_loader::load_and_attach(tx)
         .await

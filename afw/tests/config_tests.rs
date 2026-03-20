@@ -419,7 +419,7 @@ fn config_load_real_example() {
         "/../config/afw.toml"
     )));
     let config = config.unwrap();
-    assert_eq!(config.base.outbound.len(), 15);
+    assert_eq!(config.base.outbound.len(), 20);
     assert!(config.base.icmp);
     assert!(config.base.loopback);
     // Apps come from conf.d/ drop-in files

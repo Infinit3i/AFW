@@ -1,4 +1,11 @@
 # Development
+#
+# NOTE: Short-lived CLI tools (git, curl, wget, ssh, scp, rsync, pip, npm,
+# cargo, go, python3, node) are NOT tracked here. Their ports are in the
+# base config to avoid nftables rule churn that disrupts long-lived
+# connections like WebSockets and SSE streams.
+#
+# Only long-running development apps with unique port needs are tracked.
 
 [[app]]
 name = "code-oss"
@@ -47,45 +54,6 @@ outbound = [
 ]
 
 [[app]]
-name = "git"
-binary = "git"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },   # HTTPS (GitHub, GitLab)
-    { port = 80,   protocol = "tcp" },   # HTTP
-    { port = 22,   protocol = "tcp" },   # SSH
-    { port = 9418, protocol = "tcp" },   # Git protocol
-]
-
-[[app]]
-name = "ssh"
-binary = "ssh"
-enabled = true
-outbound = [
-    { port = 22,   protocol = "tcp" },   # SSH default
-    { port = 2222, protocol = "tcp" },   # SSH alternate
-    { port = 443,  protocol = "tcp" },   # SSH over HTTPS tunnels
-]
-
-[[app]]
-name = "scp"
-binary = "scp"
-enabled = true
-outbound = [
-    { port = 22,   protocol = "tcp" },
-    { port = 2222, protocol = "tcp" },
-]
-
-[[app]]
-name = "rsync"
-binary = "rsync"
-enabled = true
-outbound = [
-    { port = 22,   protocol = "tcp" },   # rsync over SSH
-    { port = 873,  protocol = "tcp" },   # rsync daemon
-]
-
-[[app]]
 name = "dockerd"
 binary = "dockerd"
 enabled = true
@@ -120,85 +88,6 @@ outbound = [
     { port = 443,  protocol = "tcp" },   # K8s API server
     { port = 6443, protocol = "tcp" },   # K8s API default
     { port = 8443, protocol = "tcp" },   # K8s API alternate
-]
-
-[[app]]
-name = "curl"
-binary = "curl"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },
-    { port = 80,   protocol = "tcp" },
-    { port = 22,   protocol = "tcp" },
-    { port = 21,   protocol = "tcp" },   # FTP
-    { port = 8080, protocol = "tcp" },
-    { port = 8443, protocol = "tcp" },
-]
-
-[[app]]
-name = "wget"
-binary = "wget"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },
-    { port = 80,   protocol = "tcp" },
-    { port = 21,   protocol = "tcp" },   # FTP
-    { port = 8080, protocol = "tcp" },
-]
-
-[[app]]
-name = "python3"
-binary = "python3"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },   # pip/PyPI
-    { port = 80,   protocol = "tcp" },
-]
-
-[[app]]
-name = "node"
-binary = "node"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },   # npm registry
-    { port = 80,   protocol = "tcp" },
-]
-
-[[app]]
-name = "npm"
-binary = "npm"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },
-    { port = 80,   protocol = "tcp" },
-]
-
-[[app]]
-name = "cargo"
-binary = "cargo"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },   # crates.io
-    { port = 80,   protocol = "tcp" },
-    { port = 22,   protocol = "tcp" },   # Git SSH deps
-]
-
-[[app]]
-name = "go"
-binary = "go"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },   # proxy.golang.org
-    { port = 80,   protocol = "tcp" },
-]
-
-[[app]]
-name = "pip"
-binary = "pip"
-enabled = true
-outbound = [
-    { port = 443,  protocol = "tcp" },   # PyPI
-    { port = 80,   protocol = "tcp" },
 ]
 
 [[app]]

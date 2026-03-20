@@ -43,19 +43,21 @@ impl NftBackend for RealNftBackend {
         let output = run_nft_output("-a list chain inet afw output")?;
         let handles = parse_rule_handles(&output, app_name);
 
-        for handle in handles.iter().rev() {
-            let cmd = format!("delete rule inet afw output handle {}", handle);
-            if let Err(e) = run_nft(&cmd) {
-                error!("Failed to delete rule handle {}: {}", handle, e);
-            }
-        }
-
         if !handles.is_empty() {
-            info!(
-                "Removed {} nftables rules for app '{}'",
-                handles.len(),
-                app_name
-            );
+            // Batch delete all handles in one atomic nft -f call
+            let mut script = String::new();
+            for handle in handles.iter().rev() {
+                script.push_str(&format!("delete rule inet afw output handle {}\n", handle));
+            }
+            if let Err(e) = run_nft_stdin(&script) {
+                error!("Failed to delete rules for app '{}': {}", app_name, e);
+            } else {
+                info!(
+                    "Removed {} nftables rules for app '{}'",
+                    handles.len(),
+                    app_name
+                );
+            }
         }
         Ok(())
     }

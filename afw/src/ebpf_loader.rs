@@ -20,7 +20,7 @@ fn ebpf_obj_path() -> &'static str {
 }
 
 /// Load and attach eBPF programs, return a channel of ProcessEvents
-pub async fn load_and_attach(tx: mpsc::Sender<ProcessEvent>) -> Result<Ebpf> {
+pub async fn load_and_attach(tx: mpsc::UnboundedSender<ProcessEvent>) -> Result<Ebpf> {
     // Try release first, fall back to debug
     let ebpf_path = ebpf_obj_path();
     let ebpf_bytes = std::fs::read(ebpf_path).with_context(|| {
@@ -83,7 +83,7 @@ pub async fn load_and_attach(tx: mpsc::Sender<ProcessEvent>) -> Result<Ebpf> {
                         let event: ProcessEvent = unsafe {
                             std::ptr::read_unaligned(buf.as_ptr() as *const ProcessEvent)
                         };
-                        if tx.send(event).await.is_err() {
+                        if tx.send(event).is_err() {
                             return; // Channel closed, daemon shutting down
                         }
                     }

@@ -22,6 +22,12 @@ outbound = [
     { port = 8443, protocol = "tcp" },   # Cloudflare HTTPS alternate
     { port = 8080, protocol = "tcp" },   # Cloudflare HTTP alternate
     { port = 8880, protocol = "tcp" },   # Cloudflare HTTP alternate
+    # Common tool ports (avoids nft churn from short-lived processes)
+    { port = 22,   protocol = "tcp" },   # SSH
+    { port = 2222, protocol = "tcp" },   # SSH alternate
+    { port = 21,   protocol = "tcp" },   # FTP
+    { port = 9418, protocol = "tcp" },   # Git protocol
+    { port = 873,  protocol = "tcp" },   # rsync
 ]
 icmp = true
 loopback = true
