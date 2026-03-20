@@ -1,0 +1,9 @@
+afw (0.1.0-1) unstable; urgency=medium
+
+  * Initial release.
+  * eBPF-powered per-application outbound firewall.
+  * Dynamic nftables rule management.
+  * 119 pre-configured application profiles.
+  * IPC authentication and input validation.
+
+ -- infinit3i <infinit3i@users.noreply.github.com>  Thu, 20 Mar 2026 00:00:00 +0000

@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo xtask build-ebpf --release
+	cargo build --release -p afw
+
+override_dh_auto_install:
+	install -Dm755 target/release/afw debian/afw/usr/bin/afw
+	install -Dm644 config/afw.toml debian/afw/etc/afw/afw.toml
+	install -dm755 debian/afw/etc/afw/conf.d
+	for f in config/conf.d/*.toml; do \
+		install -Dm644 "$$f" "debian/afw/etc/afw/conf.d/$$(basename $$f)"; \
+	done
+	install -Dm644 systemd/afw.service debian/afw/lib/systemd/system/afw.service
+
+override_dh_auto_test:
+	cargo test --package afw

@@ -1,0 +1,16 @@
+Source: afw
+Section: net
+Priority: optional
+Maintainer: infinit3i
+Build-Depends: debhelper-compat (= 13), cargo, rustc, clang, llvm, bpf-linker
+Standards-Version: 4.6.0
+Homepage: https://github.com/Infinit3i/AFW
+
+Package: afw
+Architecture: amd64
+Depends: nftables, ${misc:Depends}
+Description: Application Firewall - eBPF process monitoring with dynamic nftables rules
+ AFW is an eBPF-powered per-application outbound firewall for Linux.
+ It monitors process exec/exit via kernel tracepoints and dynamically
+ manages nftables rules - ports open when an app starts and close when
+ it exits. Default policy is drop.

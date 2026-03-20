@@ -4,33 +4,35 @@ pkgver=0.1.0
 pkgrel=1
 pkgdesc="Application Firewall - eBPF process monitoring with dynamic nftables rules"
 arch=('x86_64')
-url="https://github.com/infinit3i/AFW"
+url="https://github.com/Infinit3i/AFW"
 license=('GPL-3.0-or-later')
 depends=('nftables')
 makedepends=('rust' 'clang' 'llvm' 'bpf-linker')
 backup=('etc/afw/afw.toml')
-source=()
-sha256sums=()
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
 
 build() {
-    cd "$startdir/.."
-
-    # Build eBPF programs
+    cd "AFW-$pkgver"
     cargo xtask build-ebpf --release
-
-    # Build userspace binary
     cargo build --release -p afw
 }
 
 package() {
-    cd "$startdir/.."
+    cd "AFW-$pkgver"
 
-    # Install binary
+    # Binary
     install -Dm755 "target/release/afw" "$pkgdir/usr/bin/afw"
 
-    # Install config
+    # Main config
     install -Dm644 "config/afw.toml" "$pkgdir/etc/afw/afw.toml"
 
-    # Install systemd service
+    # Drop-in configs
+    install -dm755 "$pkgdir/etc/afw/conf.d"
+    for f in config/conf.d/*.toml; do
+        install -Dm644 "$f" "$pkgdir/etc/afw/conf.d/$(basename $f)"
+    done
+
+    # Systemd service
     install -Dm644 "systemd/afw.service" "$pkgdir/usr/lib/systemd/system/afw.service"
 }
