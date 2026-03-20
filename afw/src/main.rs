@@ -1,13 +1,5 @@
-mod cli;
-mod config;
-mod daemon;
-mod ebpf_loader;
-mod ipc;
-mod nft;
-mod state;
-
 use clap::Parser;
-use cli::{Cli, Command};
+use afw::cli::{Cli, Command};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,8 +11,8 @@ async fn main() -> anyhow::Result<()> {
                 env_logger::Env::default().default_filter_or("info"),
             )
             .init();
-            daemon::run().await
+            afw::daemon::run().await
         }
-        cmd => ipc::client_request(cmd).await,
+        cmd => afw::ipc::client_request(cmd).await,
     }
 }

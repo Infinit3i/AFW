@@ -6,11 +6,15 @@
 [base]
 # Always-allowed outbound ports
 outbound = [
-    { port = 53,  protocol = "udp" },   # DNS
+    { port = 53,  protocol = "udp" },   # DNS (UDP)
+    { port = 53,  protocol = "tcp" },   # DNS (TCP)
     { port = 123, protocol = "udp" },   # NTP
     { port = 443, protocol = "tcp" },   # HTTPS
     { port = 80,  protocol = "tcp" },   # HTTP
     { port = 68,  protocol = "udp" },   # DHCP
+    { port = 2053, protocol = "tcp" },  # Cloudflare DNS/HTTPS
+    { port = 2083, protocol = "tcp" },  # Cloudflare HTTPS
+    { port = 8443, protocol = "tcp" },  # HTTPS alternate (Cloudflare)
 ]
 icmp = true
 loopback = true
@@ -23,7 +27,9 @@ enabled = true
 outbound = [
     { port = 443, protocol = "tcp" },
     { port = 80,  protocol = "tcp" },
-    { port = 50000, range_end = 50100, protocol = "udp" },
+    { port = 2053, protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+    { port = 50000, range_end = 65535, protocol = "udp" },  # Voice/video
 ]
 
 # Firefox
@@ -34,6 +40,9 @@ enabled = true
 outbound = [
     { port = 443, protocol = "tcp" },
     { port = 80,  protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+    { port = 2053, protocol = "tcp" },
+    { port = 2083, protocol = "tcp" },
 ]
 
 # Steam

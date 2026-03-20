@@ -7,8 +7,6 @@ use aya_ebpf::{
     maps::PerfEventArray,
     programs::TracePointContext,
 };
-use aya_log_ebpf::info;
-
 use afw_common::{ProcessEvent, EVENT_EXEC, EVENT_EXIT};
 
 #[map]

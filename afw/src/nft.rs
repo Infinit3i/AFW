@@ -142,9 +142,8 @@ pub fn list_rules() -> Result<String> {
     run_nft_output("list table inet afw")
 }
 
-/// Format a PortRule into an nftables rule string (without the accept keyword for base,
-/// but with accept for the full rule)
-fn format_port_rule(rule: &PortRule) -> String {
+/// Format a PortRule into an nftables rule string
+pub fn format_port_rule(rule: &PortRule) -> String {
     let port_spec = match rule.range_end {
         Some(end) => format!("{}-{}", rule.port, end),
         None => rule.port.to_string(),
