@@ -32,7 +32,7 @@ jobs:
       - name: Install bpf-linker
         run: cargo +nightly install bpf-linker
 
-      - name: Cache cargo registry & build
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
@@ -43,17 +43,15 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Build eBPF programs
-        run: cargo xtask build-ebpf --release
+      - name: Build
+        run: |
+          cargo xtask build-ebpf --release
+          cargo build --package afw --release
 
-      - name: Check formatting
-        run: cargo fmt --package afw -- --check
+      - name: Lint
+        run: |
+          cargo fmt --package afw -- --check
+          cargo clippy --package afw -- -D warnings
 
-      - name: Run clippy
-        run: cargo clippy --package afw -- -D warnings
-
-      - name: Build userspace
-        run: cargo build --package afw --release
-
-      - name: Run tests
+      - name: Test
         run: cargo test --package afw
