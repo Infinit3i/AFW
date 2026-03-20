@@ -75,63 +75,6 @@ afw disable <name>      # Disable an app
 afw reload              # Reload config from disk
 ```
 
-## Configuration
-
-Base rules live in `/etc/afw/afw.toml`. App rules live in `/etc/afw/conf.d/` as drop-in files:
-
-```
-/etc/afw/
-├── afw.toml              # Base rules (DNS, NTP, HTTPS, Cloudflare, etc.)
-└── conf.d/
-    ├── browsers.toml
-    ├── communication.toml
-    ├── creative.toml
-    ├── development.toml
-    ├── file_transfer.toml
-    ├── gaming.toml
-    ├── media.toml
-    ├── package_managers.toml
-    ├── productivity.toml
-    ├── remote_desktop.toml
-    ├── security.toml
-    ├── system_services.toml
-    ├── virtualization.toml
-    └── vpn_clients.toml
-```
-
-### Example app rule
-
-```toml
-[[app]]
-name = "discord"
-binary = "Discord"
-enabled = true
-outbound = [
-    { port = 443, protocol = "tcp" },
-    { port = 80,  protocol = "tcp" },
-    { port = 50000, range_end = 65535, protocol = "udp" },
-]
-```
-
-Add a new category by dropping a `.toml` file in `conf.d/`.
-
-## Tests
-
-```bash
-cargo test --package afw
-```
-
-278 tests covering config parsing, CLI serialization, nftables script generation, state management with mock backends, eBPF event handling, and input validation.
-
-## Security
-
-- Input validation prevents nftables injection via app names and port rules
-- IPC commands require root (`uid 0`) for mutating operations
-- Bounded IPC reads and connection limits prevent DoS
-- Bounded eBPF event channel prevents OOM from fork bombs
-- Config file permission checks warn on insecure ownership
-- Audited against OWASP Top 10
-
 ## License
 
 GPL-3.0-or-later
