@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::sync::Arc;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::{mpsc, Mutex};
@@ -10,7 +10,6 @@ use crate::config::Config;
 use crate::ebpf_loader;
 use crate::ipc;
 use crate::nft::{NftBackend, RealNftBackend};
-use crate::notify::Notifier;
 use crate::state::AppState;
 
 pub async fn run() -> Result<()> {
@@ -35,7 +34,7 @@ pub async fn run() -> Result<()> {
     let mut state = AppState::new(config.clone());
     state.scan_existing_processes()?;
 
-    let state = Arc::new(Mutex::new(state));
+    let state_arc = Arc::new(Mutex::new(state));
 
     // Channels for eBPF events
     let (proc_tx, mut proc_rx) = mpsc::unbounded_channel();
@@ -46,7 +45,7 @@ pub async fn run() -> Result<()> {
         .context("Failed to load eBPF programs")?;
     info!("eBPF programs loaded and attached (process + connection tracking)");
 
-    let ipc_state = Arc::clone(&state);
+    let ipc_state = Arc::clone(&state_arc);
     tokio::spawn(async move {
         if let Err(e) = ipc::start_server(ipc_state).await {
             error!("IPC server error: {}", e);
@@ -60,13 +59,12 @@ pub async fn run() -> Result<()> {
 
     // Periodic timer to check aggregation windows for unknown apps
     let mut aggregation_tick = tokio::time::interval(std::time::Duration::from_secs(2));
-    let mut notifier = Notifier::new();
 
     loop {
         tokio::select! {
             Some(event) = proc_rx.recv() => {
                 let comm = ebpf_loader::comm_to_string(&event.comm);
-                let mut state = state.lock().await;
+                let mut state = state_arc.lock().await;
 
                 let result = match event.event_type {
                     EVENT_EXEC => state.handle_exec(event.pid, &comm),
@@ -90,7 +88,7 @@ pub async fn run() -> Result<()> {
                     _ => "unknown",
                 };
 
-                let mut state = state.lock().await;
+                let mut state = state_arc.lock().await;
                 state.handle_connection(
                     &comm,
                     conn.dest_port,
@@ -99,9 +97,9 @@ pub async fn run() -> Result<()> {
                 );
             }
             _ = aggregation_tick.tick() => {
-                let mut state = state.lock().await;
+                let mut state = state_arc.lock().await;
                 let summaries = state.check_aggregation_windows();
-                for summary in &summaries {
+                for summary in summaries {
                     info!(
                         "BLOCKED: '{}' tried {} port(s): {} ({} attempts, {} destination(s))",
                         summary.binary,
@@ -114,8 +112,67 @@ pub async fn run() -> Result<()> {
                         summary.dest_addrs.len(),
                     );
                     info!("  To allow: {}", summary.suggested_command());
-                    notifier.notify_blocked_app(summary);
+
+                    // Spawn notification in background so action buttons
+                    // don't block the daemon event loop
+                    let state_clone = Arc::clone(&state_arc);
+                    let binary = summary.binary.clone();
+                    tokio::spawn(async move {
+                        // This runs on a blocking thread since notify-send --wait blocks
+                        let action = tokio::task::spawn_blocking(move || {
+                            let mut n = crate::notify::Notifier::new();
+                            n.notify_blocked_app(&summary)
+                        })
+                        .await;
+
+                        if let Ok(Some(action)) = action {
+                            use crate::notify::NotifyAction;
+                            let mut state = state_clone.lock().await;
+                            match action {
+                                NotifyAction::Approve => {
+                                    info!("User approved '{}' via notification", binary);
+                                    // Build config and save
+                                    if let Some(conn) = state.unknown_connections().get(&binary).cloned() {
+                                        let port_rules: Vec<crate::config::PortRule> = conn.ports.iter().map(|(port, proto)| {
+                                            crate::config::PortRule { port: *port, range_end: None, protocol: proto.clone() }
+                                        }).collect();
+                                        let app_name = binary.to_lowercase().replace(' ', "-");
+                                        let mut cfg = state.config().clone();
+                                        cfg.app.push(crate::config::AppConfig {
+                                            name: app_name.clone(),
+                                            binary: binary.clone(),
+                                            enabled: true,
+                                            outbound: port_rules,
+                                        });
+                                        if let Err(e) = cfg.save(None) {
+                                            error!("Failed to save config for '{}': {}", binary, e);
+                                        } else if let Err(e) = state.reload_config(cfg) {
+                                            error!("Failed to reload after approving '{}': {}", binary, e);
+                                        } else {
+                                            state.clear_unknown(&binary);
+                                            info!("Permanently approved '{}'", app_name);
+                                        }
+                                    }
+                                }
+                                NotifyAction::AllowOnce => {
+                                    info!("User allowed '{}' once via notification", binary);
+                                    if let Err(e) = state.allow_once(&binary) {
+                                        error!("Failed to allow-once '{}': {}", binary, e);
+                                    }
+                                }
+                                NotifyAction::Deny => {
+                                    info!("User denied '{}' via notification", binary);
+                                    state.deny_app(&binary);
+                                }
+                                NotifyAction::Dismissed => {
+                                    debug!("Notification for '{}' dismissed", binary);
+                                }
+                            }
+                        }
+                    });
                 }
+                // Drop the lock so spawned tasks can acquire it
+                drop(state);
             }
             _ = sigterm.recv() => {
                 info!("Received SIGTERM, shutting down...");

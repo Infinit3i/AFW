@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::{debug, error, info};
 use std::collections::HashMap;
 use std::process::Command;
 use std::time::Instant;
@@ -8,10 +8,27 @@ use crate::state::UnknownConnectionSummary;
 /// Minimum seconds between notifications for the same app
 const RATE_LIMIT_SECS: u64 = 30;
 
-/// Desktop notification sender
+/// Action chosen by the user from a notification
+#[derive(Debug, Clone, PartialEq)]
+pub enum NotifyAction {
+    /// Permanently allow (save to config)
+    Approve,
+    /// Temporarily allow (removed on exit/restart)
+    AllowOnce,
+    /// Permanently deny (suppress future notifications)
+    Deny,
+    /// User dismissed or notification timed out
+    Dismissed,
+}
+
+/// Desktop notification sender with action button support
 pub struct Notifier {
     /// Track when we last notified for each binary (rate limiting)
     last_notified: HashMap<String, Instant>,
+    /// Cached desktop session info (user, env vars)
+    session_cache: Option<(String, HashMap<String, String>)>,
+    /// Whether session detection has been attempted
+    session_detected: bool,
 }
 
 impl Default for Notifier {
@@ -24,12 +41,18 @@ impl Notifier {
     pub fn new() -> Self {
         Self {
             last_notified: HashMap::new(),
+            session_cache: None,
+            session_detected: false,
         }
     }
 
-    /// Send a desktop notification for a blocked unknown app.
+    /// Send a desktop notification with action buttons for a blocked app.
+    /// Returns the user's chosen action, or None if notification couldn't be sent.
     /// Rate-limited to one notification per app per RATE_LIMIT_SECS.
-    pub fn notify_blocked_app(&mut self, summary: &UnknownConnectionSummary) {
+    pub fn notify_blocked_app(
+        &mut self,
+        summary: &UnknownConnectionSummary,
+    ) -> Option<NotifyAction> {
         // Rate limit
         if let Some(last) = self.last_notified.get(&summary.binary) {
             if last.elapsed().as_secs() < RATE_LIMIT_SECS {
@@ -37,7 +60,7 @@ impl Notifier {
                     "Skipping notification for '{}' (rate limited)",
                     summary.binary
                 );
-                return;
+                return None;
             }
         }
         self.last_notified
@@ -52,67 +75,116 @@ impl Notifier {
 
         let title = format!("AFW Blocked: {}", summary.binary);
         let body = format!(
-            "Blocked {} connection attempt(s)\nPorts: {}\nTo allow: {}",
-            summary.attempt_count,
-            port_list,
-            summary.suggested_command()
+            "Blocked {} connection attempt(s)\nPorts: {}",
+            summary.attempt_count, port_list,
         );
 
-        // Try to send desktop notification
-        if !try_notify_send(&title, &body) {
-            // Fallback: just log it (already logged by daemon, but mark it)
-            info!("No desktop session available for notification. Use `afw pending` to review.");
-        }
-    }
-}
-
-/// Try to send a notification via notify-send using the logged-in user's session.
-/// Returns true if notification was sent successfully.
-fn try_notify_send(title: &str, body: &str) -> bool {
-    // Find the first graphical user session
-    if let Some((uid, user, env_vars)) = find_desktop_session() {
-        debug!("Sending notification to user '{}' (uid {})", user, uid);
-
-        let mut cmd = Command::new("sudo");
-        cmd.args(["-u", &user, "notify-send"]);
-        cmd.args([
-            "--app-name=AFW",
-            "--urgency=critical",
-            "--icon=security-high",
-        ]);
-        cmd.arg(title);
-        cmd.arg(body);
-
-        // Pass the user's display/dbus environment
-        for (key, val) in &env_vars {
-            cmd.env(key, val);
+        // Detect desktop session (cached after first attempt)
+        if !self.session_detected {
+            self.session_cache = find_desktop_session();
+            self.session_detected = true;
         }
 
-        match cmd.output() {
-            Ok(output) => {
-                if output.status.success() {
-                    debug!("Desktop notification sent successfully");
-                    return true;
-                }
-                debug!(
-                    "notify-send failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
+        let (user, env_vars) = match &self.session_cache {
+            Some((u, e)) => (u.clone(), e.clone()),
+            None => {
+                info!(
+                    "No desktop session available for notification. Use `afw pending` to review."
                 );
+                return None;
             }
-            Err(e) => {
-                debug!("Failed to run notify-send: {}", e);
-            }
-        }
-    }
+        };
 
-    false
+        // Try interactive notification with action buttons
+        let action = send_interactive_notification(&user, &env_vars, &title, &body);
+        debug!("Notification action for '{}': {:?}", summary.binary, action);
+        Some(action)
+    }
 }
 
-/// Find a logged-in desktop user's session and return (uid, username, env_vars).
-/// Looks for DISPLAY or WAYLAND_DISPLAY in /proc to find a graphical session.
-fn find_desktop_session() -> Option<(u32, String, HashMap<String, String>)> {
-    // Strategy: find a process with DISPLAY or WAYLAND_DISPLAY set
-    // by scanning /proc/*/environ for non-root users
+/// Send a notification with action buttons via notify-send.
+/// Blocks until the user clicks a button or the notification times out.
+fn send_interactive_notification(
+    user: &str,
+    env_vars: &HashMap<String, String>,
+    title: &str,
+    body: &str,
+) -> NotifyAction {
+    // Try notify-send with --action flags (requires libnotify >= 0.8)
+    let mut cmd = Command::new("sudo");
+    cmd.args(["-u", user, "notify-send"]);
+    cmd.args([
+        "--app-name=AFW",
+        "--urgency=critical",
+        "--icon=security-high",
+        "--wait",
+        "--action=approve=Always Allow",
+        "--action=allow_once=Allow Once",
+        "--action=deny=Deny",
+    ]);
+    cmd.arg(title);
+    cmd.arg(body);
+
+    for (key, val) in env_vars {
+        cmd.env(key, val);
+    }
+
+    match cmd.output() {
+        Ok(output) => {
+            if output.status.success() {
+                let action_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                return match action_id.as_str() {
+                    "approve" => NotifyAction::Approve,
+                    "allow_once" => NotifyAction::AllowOnce,
+                    "deny" => NotifyAction::Deny,
+                    _ => NotifyAction::Dismissed,
+                };
+            }
+            debug!(
+                "notify-send exited with {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+
+            // Fallback: try without actions (older notify-send or no action support)
+            send_simple_notification(user, env_vars, title, body);
+            NotifyAction::Dismissed
+        }
+        Err(e) => {
+            error!("Failed to run notify-send: {}", e);
+            NotifyAction::Dismissed
+        }
+    }
+}
+
+/// Send a simple notification without action buttons (fallback)
+fn send_simple_notification(
+    user: &str,
+    env_vars: &HashMap<String, String>,
+    title: &str,
+    body: &str,
+) {
+    let mut cmd = Command::new("sudo");
+    cmd.args(["-u", user, "notify-send"]);
+    cmd.args([
+        "--app-name=AFW",
+        "--urgency=critical",
+        "--icon=security-high",
+    ]);
+    cmd.arg(title);
+    cmd.arg(format!("{}\nUse `afw pending` to review", body));
+
+    for (key, val) in env_vars {
+        cmd.env(key, val);
+    }
+
+    if let Err(e) = cmd.output() {
+        debug!("Simple notification also failed: {}", e);
+    }
+}
+
+/// Find a logged-in desktop user's session and return (username, env_vars).
+fn find_desktop_session() -> Option<(String, HashMap<String, String>)> {
     let proc_dir = match std::fs::read_dir("/proc") {
         Ok(d) => d,
         Err(_) => return None,
@@ -122,14 +194,11 @@ fn find_desktop_session() -> Option<(u32, String, HashMap<String, String>)> {
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
 
-        // Only numeric dirs (PIDs)
         if name_str.parse::<u32>().is_err() {
             continue;
         }
 
         let pid_path = entry.path();
-
-        // Check process owner
         let status_path = pid_path.join("status");
         let status = match std::fs::read_to_string(&status_path) {
             Ok(s) => s,
@@ -143,12 +212,10 @@ fn find_desktop_session() -> Option<(u32, String, HashMap<String, String>)> {
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
 
-        // Skip root
         if uid == 0 {
             continue;
         }
 
-        // Read environ for display variables
         let environ_path = pid_path.join("environ");
         let environ = match std::fs::read(&environ_path) {
             Ok(bytes) => bytes,
@@ -164,16 +231,13 @@ fn find_desktop_session() -> Option<(u32, String, HashMap<String, String>)> {
             })
             .collect();
 
-        // Look for a graphical session
         let has_display =
             env_pairs.contains_key("DISPLAY") || env_pairs.contains_key("WAYLAND_DISPLAY");
         let has_dbus = env_pairs.contains_key("DBUS_SESSION_BUS_ADDRESS");
 
         if has_display && has_dbus {
-            // Get the username
             let username = get_username(uid).unwrap_or_else(|| format!("#{}", uid));
 
-            // Collect the relevant env vars
             let mut session_env = HashMap::new();
             for key in &[
                 "DISPLAY",
@@ -186,7 +250,7 @@ fn find_desktop_session() -> Option<(u32, String, HashMap<String, String>)> {
                 }
             }
 
-            return Some((uid, username, session_env));
+            return Some((username, session_env));
         }
     }
 
