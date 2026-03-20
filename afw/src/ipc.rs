@@ -2,9 +2,9 @@ use anyhow::{Context, Result};
 use log::{debug, error, info};
 use serde_json;
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 
 use crate::cli::{Command, DaemonResponse};
 use crate::config::{self, Config};
@@ -32,13 +32,32 @@ pub async fn start_server(state: Arc<Mutex<AppState>>) -> Result<()> {
 
     info!("IPC server listening on {}", SOCKET_PATH);
 
+    // Limit concurrent IPC connections to prevent resource exhaustion
+    let semaphore = Arc::new(Semaphore::new(16));
+
     loop {
         match listener.accept().await {
             Ok((stream, _)) => {
                 let state = Arc::clone(&state);
+                let permit = match semaphore.clone().try_acquire_owned() {
+                    Ok(permit) => permit,
+                    Err(_) => {
+                        error!("IPC connection limit reached, rejecting client");
+                        continue;
+                    }
+                };
                 tokio::spawn(async move {
-                    if let Err(e) = handle_client(stream, state).await {
-                        error!("Error handling IPC client: {}", e);
+                    let _permit = permit; // held until handler completes
+                                          // Timeout: clients get 5 seconds to send their command
+                    match tokio::time::timeout(
+                        std::time::Duration::from_secs(5),
+                        handle_client(stream, state),
+                    )
+                    .await
+                    {
+                        Ok(Err(e)) => error!("Error handling IPC client: {}", e),
+                        Err(_) => error!("IPC client timed out"),
+                        _ => {}
                     }
                 });
             }
@@ -83,9 +102,14 @@ async fn handle_client(stream: UnixStream, state: Arc<Mutex<AppState>>) -> Resul
     let peer_uid = peer_cred.uid();
 
     let (reader, mut writer) = stream.into_split();
-    let mut reader = BufReader::new(reader);
+    // Limit read to 64KB to prevent OOM from malicious clients
+    let limited = reader.take(65536);
+    let mut reader = BufReader::new(limited);
     let mut line = String::new();
     reader.read_line(&mut line).await?;
+    if line.is_empty() {
+        anyhow::bail!("Empty or oversized request");
+    }
 
     let cmd: Command =
         serde_json::from_str(line.trim()).context("Failed to parse command from client")?;

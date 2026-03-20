@@ -1,10 +1,38 @@
 use anyhow::{Context, Result};
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_CONFIG_PATH: &str = "/etc/afw/afw.toml";
+
+/// Check that a config file has safe permissions (not world-writable, owned by root)
+fn check_file_permissions(path: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let meta = path
+            .metadata()
+            .with_context(|| format!("Failed to stat config file: {}", path.display()))?;
+        // Warn if writable by group or other
+        if meta.mode() & 0o022 != 0 {
+            warn!(
+                "Config file {} is writable by group/other (mode {:o}). This is a security risk.",
+                path.display(),
+                meta.mode() & 0o777
+            );
+        }
+        // Warn if not owned by root (uid 0) — but don't fail for dev/testing
+        if meta.uid() != 0 {
+            warn!(
+                "Config file {} is not owned by root (uid {}). In production, config files should be root-owned.",
+                path.display(),
+                meta.uid()
+            );
+        }
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -101,6 +129,8 @@ impl Config {
     /// Load the main config and merge in all conf.d/*.toml drop-in files
     pub fn load(path: Option<&str>) -> Result<Self> {
         let config_path = path.unwrap_or(DEFAULT_CONFIG_PATH);
+        // Check file permissions (warns but doesn't fail for dev flexibility)
+        check_file_permissions(Path::new(config_path)).ok();
         let contents = std::fs::read_to_string(config_path)
             .with_context(|| format!("Failed to read config: {}", config_path))?;
         let mut config: Config = toml::from_str(&contents)
@@ -122,6 +152,7 @@ impl Config {
             files.sort(); // Alphabetical order for predictability
 
             for file in &files {
+                check_file_permissions(file).ok();
                 let file_str = file.to_string_lossy();
                 let contents = std::fs::read_to_string(file)
                     .with_context(|| format!("Failed to read drop-in config: {}", file_str))?;
