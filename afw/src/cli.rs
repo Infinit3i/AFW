@@ -65,6 +65,9 @@ pub enum Command {
 
     /// Show current nftables rules managed by AFW
     Rules,
+
+    /// Show unknown apps that attempted connections (blocked by default-drop)
+    Pending,
 }
 
 /// Response from daemon to CLI

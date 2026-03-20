@@ -1,9 +1,27 @@
 use anyhow::Result;
-use log::{debug, info};
+use log::{debug, info, warn};
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 use crate::config::Config;
 use crate::nft::{NftBackend, RealNftBackend};
+
+/// A connection attempt from an unknown (unconfigured) application
+#[derive(Debug, Clone)]
+pub struct UnknownConnection {
+    /// Binary/comm name
+    pub binary: String,
+    /// Ports the app tried to connect to (port, protocol_str)
+    pub ports: HashSet<(u16, String)>,
+    /// Destination IPs seen
+    pub dest_addrs: HashSet<String>,
+    /// First seen
+    pub first_seen: Instant,
+    /// Last seen
+    pub last_seen: Instant,
+    /// Number of connection attempts
+    pub attempt_count: u32,
+}
 
 /// Runtime state tracking active processes and their firewall rules
 pub struct AppState {
@@ -15,6 +33,8 @@ pub struct AppState {
     config: Config,
     /// nftables backend
     nft: Box<dyn NftBackend>,
+    /// Unknown apps that tried to connect (binary -> connection info)
+    unknown_connections: HashMap<String, UnknownConnection>,
 }
 
 impl AppState {
@@ -35,6 +55,7 @@ impl AppState {
             binary_map,
             config,
             nft,
+            unknown_connections: HashMap::new(),
         }
     }
 
@@ -99,6 +120,99 @@ impl AppState {
         }
 
         Ok(())
+    }
+
+    /// Handle a connection attempt event from eBPF.
+    /// If the app is known/configured, this is a no-op (nftables handles it).
+    /// If unknown, track it for potential user approval.
+    /// Returns true if this is a NEW unknown app (first time seen).
+    pub fn handle_connection(
+        &mut self,
+        comm: &str,
+        dest_port: u16,
+        protocol: &str,
+        dest_addr: &str,
+    ) -> bool {
+        // Known app — nftables already has rules, nothing to do
+        if self.binary_map.contains_key(comm) {
+            return false;
+        }
+
+        // Skip common system processes that aren't interesting
+        if comm.is_empty() || comm.starts_with("kworker") || comm == "systemd" {
+            return false;
+        }
+
+        let now = Instant::now();
+        let is_new = !self.unknown_connections.contains_key(comm);
+
+        let entry = self
+            .unknown_connections
+            .entry(comm.to_string())
+            .or_insert_with(|| UnknownConnection {
+                binary: comm.to_string(),
+                ports: HashSet::new(),
+                dest_addrs: HashSet::new(),
+                first_seen: now,
+                last_seen: now,
+                attempt_count: 0,
+            });
+
+        entry.ports.insert((dest_port, protocol.to_string()));
+        entry.dest_addrs.insert(dest_addr.to_string());
+        entry.last_seen = now;
+        entry.attempt_count += 1;
+
+        if is_new {
+            warn!(
+                "Unknown app '{}' attempted connection to {}:{}/{}",
+                comm, dest_addr, dest_port, protocol
+            );
+        } else {
+            debug!(
+                "Unknown app '{}' connection attempt #{} to {}:{}/{}",
+                comm, entry.attempt_count, dest_addr, dest_port, protocol
+            );
+        }
+
+        is_new
+    }
+
+    /// Get all unknown connection attempts
+    pub fn unknown_connections(&self) -> &HashMap<String, UnknownConnection> {
+        &self.unknown_connections
+    }
+
+    /// Get unknown connections summary for display
+    pub fn unknown_connections_info(&self) -> String {
+        let mut out = String::new();
+        if self.unknown_connections.is_empty() {
+            out.push_str("No unknown connection attempts.\n");
+            return out;
+        }
+
+        out.push_str(&format!(
+            "Unknown apps with blocked connections: {}\n\n",
+            self.unknown_connections.len()
+        ));
+
+        for (binary, conn) in &self.unknown_connections {
+            let elapsed = conn.first_seen.elapsed().as_secs();
+            out.push_str(&format!(
+                "  {} ({} attempts, first seen {}s ago)\n",
+                binary, conn.attempt_count, elapsed
+            ));
+            for (port, proto) in &conn.ports {
+                out.push_str(&format!("    -> {}/{}\n", port, proto));
+            }
+        }
+
+        out
+    }
+
+    /// Clear unknown connection tracking for a specific app (e.g. after approval)
+    pub fn clear_unknown(&mut self, binary: &str) {
+        self.unknown_connections.remove(binary);
     }
 
     /// Scan /proc for already-running monitored processes

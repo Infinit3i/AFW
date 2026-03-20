@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::{mpsc, Mutex};
 
-use afw_common::{EVENT_EXEC, EVENT_EXIT};
+use afw_common::{EVENT_EXEC, EVENT_EXIT, PROTO_TCP, PROTO_UDP};
 
 use crate::config::Config;
 use crate::ebpf_loader;
@@ -13,7 +13,6 @@ use crate::nft::{NftBackend, RealNftBackend};
 use crate::state::AppState;
 
 pub async fn run() -> Result<()> {
-    // Print banner on startup
     eprintln!("{}", crate::banner::BANNER);
     info!("AFW daemon starting...");
 
@@ -37,12 +36,14 @@ pub async fn run() -> Result<()> {
 
     let state = Arc::new(Mutex::new(state));
 
-    let (tx, mut rx) = mpsc::unbounded_channel();
+    // Channels for eBPF events
+    let (proc_tx, mut proc_rx) = mpsc::unbounded_channel();
+    let (conn_tx, mut conn_rx) = mpsc::unbounded_channel();
 
-    let _bpf = ebpf_loader::load_and_attach(tx)
+    let _bpf = ebpf_loader::load_and_attach(proc_tx, conn_tx)
         .await
         .context("Failed to load eBPF programs")?;
-    info!("eBPF programs loaded and attached");
+    info!("eBPF programs loaded and attached (process + connection tracking)");
 
     let ipc_state = Arc::clone(&state);
     tokio::spawn(async move {
@@ -54,11 +55,11 @@ pub async fn run() -> Result<()> {
     let mut sigterm = signal(SignalKind::terminate())?;
     let mut sigint = signal(SignalKind::interrupt())?;
 
-    info!("AFW daemon ready. Monitoring process events...");
+    info!("AFW daemon ready. Monitoring process and connection events...");
 
     loop {
         tokio::select! {
-            Some(event) = rx.recv() => {
+            Some(event) = proc_rx.recv() => {
                 let comm = ebpf_loader::comm_to_string(&event.comm);
                 let mut state = state.lock().await;
 
@@ -74,6 +75,25 @@ pub async fn run() -> Result<()> {
                 if let Err(e) = result {
                     error!("Error handling event for '{}' (pid {}): {}", comm, event.pid, e);
                 }
+            }
+            Some(conn) = conn_rx.recv() => {
+                let comm = ebpf_loader::comm_to_string(&conn.comm);
+                let dest_addr = ebpf_loader::ipv4_to_string(conn.dest_addr);
+                let protocol = match conn.protocol {
+                    PROTO_TCP => "tcp",
+                    PROTO_UDP => "udp",
+                    _ => "unknown",
+                };
+
+                let mut state = state.lock().await;
+                let _is_new = state.handle_connection(
+                    &comm,
+                    conn.dest_port,
+                    protocol,
+                    &dest_addr,
+                );
+
+                // Phase 3 will add desktop notifications here when _is_new is true
             }
             _ = sigterm.recv() => {
                 info!("Received SIGTERM, shutting down...");

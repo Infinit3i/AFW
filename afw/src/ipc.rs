@@ -298,6 +298,13 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
                 },
             }
         }
+        Command::Pending => {
+            let state = state.lock().await;
+            DaemonResponse {
+                success: true,
+                message: state.unknown_connections_info(),
+            }
+        }
         Command::Daemon => DaemonResponse {
             success: false,
             message: "Cannot run daemon via IPC".into(),

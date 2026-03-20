@@ -5,11 +5,11 @@
 ## Interactive Connection Control (Little Snitch for Linux)
 
 ### Phase 1: eBPF Connection Tracking
-- [ ] Add new eBPF kprobe on `tcp_v4_connect` (and `udp_sendmsg` for UDP)
-- [ ] Capture: PID, comm, destination IP, destination port, protocol
-- [ ] New `ConnectionEvent` struct in `afw-common`
-- [ ] New perf buffer channel for connection events (separate from exec/exit)
-- [ ] Daemon receives connection events alongside process events
+- [x] Add new eBPF kprobe on `tcp_v4_connect` (and `udp_sendmsg` for UDP)
+- [x] Capture: PID, comm, destination IP, destination port, protocol
+- [x] New `ConnectionEvent` struct in `afw-common`
+- [x] New perf buffer channel for connection events (separate from exec/exit)
+- [x] Daemon receives connection events alongside process events
 
 ### Phase 2: Unknown App Detection
 - [ ] When a connection event arrives for an app NOT in the config, flag it as "unknown"
