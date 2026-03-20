@@ -106,6 +106,11 @@ impl Config {
         let mut config: Config = toml::from_str(&contents)
             .with_context(|| format!("Failed to parse config: {}", config_path))?;
 
+        // Validate main config before loading drop-ins
+        config
+            .validate()
+            .with_context(|| format!("Validation failed for {}", config_path))?;
+
         // Load drop-in configs from conf.d/
         let conf_dir = conf_dir_for(config_path);
         if conf_dir.is_dir() {
@@ -122,6 +127,20 @@ impl Config {
                     .with_context(|| format!("Failed to read drop-in config: {}", file_str))?;
                 let drop_in: DropInConfig = toml::from_str(&contents)
                     .with_context(|| format!("Failed to parse drop-in config: {}", file_str))?;
+                // Validate drop-in apps before merging
+                for app in &drop_in.app {
+                    validate_name(&app.name).with_context(|| {
+                        format!("Invalid app name '{}' in {}", app.name, file_str)
+                    })?;
+                    validate_name(&app.binary).with_context(|| {
+                        format!("Invalid binary '{}' in {}", app.binary, file_str)
+                    })?;
+                    for rule in &app.outbound {
+                        rule.validate().with_context(|| {
+                            format!("Invalid port rule in app '{}' in {}", app.name, file_str)
+                        })?;
+                    }
+                }
                 info!(
                     "Loaded drop-in config: {} ({} apps)",
                     file_str,
@@ -190,6 +209,86 @@ impl Config {
             .filter(|(_, a)| a.enabled)
             .map(|(i, a)| (a.binary.clone(), i))
             .collect()
+    }
+}
+
+// === Validation ===
+
+/// Validate a name (app name or binary name) for safe use in nftables comments.
+/// Rejects characters that could enable injection: quotes, newlines, backslashes,
+/// semicolons, and other shell/nft metacharacters. Allows spaces (safe inside
+/// nft quoted comments), alphanumeric, hyphens, underscores, dots, slashes, parens.
+pub fn validate_name(name: &str) -> Result<()> {
+    if name.is_empty() {
+        anyhow::bail!("Name cannot be empty");
+    }
+    if name.len() > 64 {
+        anyhow::bail!("Name '{}...' exceeds 64 character limit", &name[..32]);
+    }
+    // Deny injection-enabling characters
+    for c in name.chars() {
+        match c {
+            '"' | '\'' | '\\' | '\n' | '\r' | '\0' | ';' | '{' | '}' | '#' | '`' | '$' => {
+                anyhow::bail!(
+                    "Name '{}' contains forbidden character '{}'",
+                    name,
+                    c.escape_debug()
+                );
+            }
+            // Allow printable ASCII (space through tilde, minus the denied chars above)
+            ' '..='~' => {}
+            _ => {
+                anyhow::bail!(
+                    "Name '{}' contains non-ASCII character '{}'",
+                    name,
+                    c.escape_debug()
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+impl PortRule {
+    /// Validate that a PortRule has a safe protocol and valid range
+    pub fn validate(&self) -> Result<()> {
+        if self.protocol != "tcp" && self.protocol != "udp" {
+            anyhow::bail!(
+                "Invalid protocol '{}', expected 'tcp' or 'udp'",
+                self.protocol
+            );
+        }
+        if let Some(end) = self.range_end {
+            if end <= self.port {
+                anyhow::bail!(
+                    "Port range end {} must be greater than start {}",
+                    end,
+                    self.port
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Config {
+    /// Validate all fields for safe use (prevents injection via config files)
+    pub fn validate(&self) -> Result<()> {
+        for rule in &self.base.outbound {
+            rule.validate()
+                .with_context(|| "Invalid base outbound rule".to_string())?;
+        }
+        for app in &self.app {
+            validate_name(&app.name).with_context(|| format!("Invalid app name '{}'", app.name))?;
+            validate_name(&app.binary).with_context(|| {
+                format!("Invalid binary name '{}' in app '{}'", app.binary, app.name)
+            })?;
+            for rule in &app.outbound {
+                rule.validate()
+                    .with_context(|| format!("Invalid port rule in app '{}'", app.name))?;
+            }
+        }
+        Ok(())
     }
 }
 

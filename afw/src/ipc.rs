@@ -49,7 +49,39 @@ pub async fn start_server(state: Arc<Mutex<AppState>>) -> Result<()> {
     }
 }
 
+/// Check if a command requires root privileges to execute
+fn requires_privilege(cmd: &Command) -> bool {
+    matches!(
+        cmd,
+        Command::Add { .. }
+            | Command::Remove { .. }
+            | Command::Enable { .. }
+            | Command::Disable { .. }
+            | Command::Reload
+    )
+}
+
+/// Validate app name and binary for safe use in nftables (prevents injection)
+fn validate_add_command(name: &str, binary: &str, ports: &[String]) -> Result<(), String> {
+    if let Err(e) = crate::config::validate_name(name) {
+        return Err(format!("Invalid app name: {}", e));
+    }
+    if let Err(e) = crate::config::validate_name(binary) {
+        return Err(format!("Invalid binary name: {}", e));
+    }
+    for p in ports {
+        if let Err(e) = crate::config::parse_port_rule(p) {
+            return Err(format!("Invalid port '{}': {}", p, e));
+        }
+    }
+    Ok(())
+}
+
 async fn handle_client(stream: UnixStream, state: Arc<Mutex<AppState>>) -> Result<()> {
+    // Check peer credentials before processing
+    let peer_cred = stream.peer_cred()?;
+    let peer_uid = peer_cred.uid();
+
     let (reader, mut writer) = stream.into_split();
     let mut reader = BufReader::new(reader);
     let mut line = String::new();
@@ -58,7 +90,23 @@ async fn handle_client(stream: UnixStream, state: Arc<Mutex<AppState>>) -> Resul
     let cmd: Command =
         serde_json::from_str(line.trim()).context("Failed to parse command from client")?;
 
-    debug!("Received IPC command: {:?}", cmd);
+    debug!("Received IPC command: {:?} (uid: {})", cmd, peer_uid);
+
+    // Enforce privilege for mutating commands
+    if requires_privilege(&cmd) && peer_uid != 0 {
+        let response = DaemonResponse {
+            success: false,
+            message: format!(
+                "Permission denied: root required for {:?} (uid {} rejected)",
+                cmd, peer_uid
+            ),
+        };
+        let response_json = serde_json::to_string(&response)?;
+        writer.write_all(response_json.as_bytes()).await?;
+        writer.write_all(b"\n").await?;
+        writer.shutdown().await?;
+        return Ok(());
+    }
 
     let response = process_command(cmd, state).await;
 
@@ -115,6 +163,13 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
             binary,
             ports,
         } => {
+            // Validate inputs to prevent nftables injection
+            if let Err(msg) = validate_add_command(&name, &binary, &ports) {
+                return DaemonResponse {
+                    success: false,
+                    message: msg,
+                };
+            }
             let port_rules: Result<Vec<_>, _> =
                 ports.iter().map(|p| config::parse_port_rule(p)).collect();
             match port_rules {
