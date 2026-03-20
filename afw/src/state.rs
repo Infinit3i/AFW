@@ -6,6 +6,66 @@ use std::time::Instant;
 use crate::config::Config;
 use crate::nft::{NftBackend, RealNftBackend};
 
+/// Binaries that should never trigger dynamic rule changes or unknown app alerts.
+/// These are short-lived CLI tools, system processes, and package managers whose
+/// ports are handled by the base config. Tracking them causes nft rule churn
+/// that disrupts long-lived connections (WebSockets, SSE streams, etc.).
+const IGNORED_BINARIES: &[&str] = &[
+    // System
+    "systemd",
+    "systemd-resolve",
+    "systemd-timesyn",
+    "systemd-network",
+    "kworker",
+    "ksoftirqd",
+    "dbus-broker",
+    // Shell / CLI tools
+    "git",
+    "ssh",
+    "scp",
+    "rsync",
+    "curl",
+    "wget",
+    "cargo",
+    "go",
+    "pip",
+    "pip3",
+    "python3",
+    "python",
+    "node",
+    "npm",
+    "npx",
+    "yarn",
+    "pnpm",
+    // Package managers
+    "pacman",
+    "yay",
+    "paru",
+    "apt",
+    "apt-get",
+    "dpkg",
+    "dnf",
+    "yum",
+    "zypper",
+    "flatpak",
+    "snapd",
+    "snap",
+    "nix",
+    "brew",
+    "makepkg",
+    "pikaur",
+    // Security updates
+    "freshclam",
+    // Build tools
+    "cc",
+    "gcc",
+    "clang",
+    "rustc",
+    "make",
+    "cmake",
+    "ninja",
+];
+
 /// A connection attempt from an unknown (unconfigured) application
 #[derive(Debug, Clone)]
 pub struct UnknownConnection {
@@ -138,8 +198,13 @@ impl AppState {
             return false;
         }
 
-        // Skip common system processes that aren't interesting
-        if comm.is_empty() || comm.starts_with("kworker") || comm == "systemd" {
+        // Skip system processes and short-lived CLI tools that use base ports.
+        // These churn too fast for dynamic tracking and their ports are in base config.
+        if comm.is_empty()
+            || IGNORED_BINARIES.contains(&comm)
+            || comm.starts_with("kworker")
+            || comm.starts_with("ksoftirqd")
+        {
             return false;
         }
 
