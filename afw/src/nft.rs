@@ -18,9 +18,13 @@ pub struct RealNftBackend;
 
 impl NftBackend for RealNftBackend {
     fn init_table(&self, base_ports: &[PortRule], icmp: bool, loopback: bool) -> Result<()> {
-        let _ = run_nft("delete table inet afw");
+        // Build the full table script and apply atomically via nft -f.
+        // "destroy table" removes it if it exists (no error if missing),
+        // then we create fresh — all in one atomic transaction so there's
+        // no gap where traffic is dropped without rules.
         let rules = build_init_table_script(base_ports, icmp, loopback);
-        run_nft_stdin(&rules).context("Failed to initialize nftables table")?;
+        let atomic_script = format!("destroy table inet afw\n{}", rules);
+        run_nft_stdin(&atomic_script).context("Failed to initialize nftables table")?;
         info!("nftables table 'inet afw' initialized with base rules");
         Ok(())
     }
