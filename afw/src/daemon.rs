@@ -10,6 +10,7 @@ use crate::config::Config;
 use crate::ebpf_loader;
 use crate::ipc;
 use crate::nft::{NftBackend, RealNftBackend};
+use crate::notify::Notifier;
 use crate::state::AppState;
 
 pub async fn run() -> Result<()> {
@@ -59,6 +60,7 @@ pub async fn run() -> Result<()> {
 
     // Periodic timer to check aggregation windows for unknown apps
     let mut aggregation_tick = tokio::time::interval(std::time::Duration::from_secs(2));
+    let mut notifier = Notifier::new();
 
     loop {
         tokio::select! {
@@ -112,7 +114,7 @@ pub async fn run() -> Result<()> {
                         summary.dest_addrs.len(),
                     );
                     info!("  To allow: {}", summary.suggested_command());
-                    // Phase 3 will send desktop notification here
+                    notifier.notify_blocked_app(summary);
                 }
             }
             _ = sigterm.recv() => {

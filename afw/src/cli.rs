@@ -68,6 +68,12 @@ pub enum Command {
 
     /// Show unknown apps that attempted connections (blocked by default-drop)
     Pending,
+
+    /// Approve a blocked unknown app (auto-adds rules based on detected ports)
+    Approve {
+        /// Binary/process name to approve (as shown in `afw pending`)
+        binary: String,
+    },
 }
 
 /// Response from daemon to CLI

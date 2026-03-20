@@ -76,6 +76,7 @@ fn requires_privilege(cmd: &Command) -> bool {
             | Command::Remove { .. }
             | Command::Enable { .. }
             | Command::Disable { .. }
+            | Command::Approve { .. }
             | Command::Reload
     )
 }
@@ -303,6 +304,101 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
             DaemonResponse {
                 success: true,
                 message: state.unknown_connections_info(),
+            }
+        }
+        Command::Approve { binary } => {
+            let mut state = state.lock().await;
+
+            // Look up the unknown connection info
+            let conn = state.unknown_connections().get(&binary).cloned();
+            match conn {
+                Some(conn) => {
+                    // Build port rules from detected ports
+                    let port_rules: Vec<config::PortRule> = conn
+                        .ports
+                        .iter()
+                        .map(|(port, proto)| config::PortRule {
+                            port: *port,
+                            range_end: None,
+                            protocol: proto.clone(),
+                        })
+                        .collect();
+
+                    if port_rules.is_empty() {
+                        return DaemonResponse {
+                            success: false,
+                            message: format!("No ports detected for '{}'", binary),
+                        };
+                    }
+
+                    let app_name = binary.to_lowercase().replace(' ', "-");
+
+                    // Validate
+                    if let Err(e) = config::validate_name(&app_name) {
+                        return DaemonResponse {
+                            success: false,
+                            message: format!("Invalid name: {}", e),
+                        };
+                    }
+                    if let Err(e) = config::validate_name(&binary) {
+                        return DaemonResponse {
+                            success: false,
+                            message: format!("Invalid binary: {}", e),
+                        };
+                    }
+
+                    let mut cfg = state.config().clone();
+
+                    if cfg.find_app_by_name(&app_name).is_some() {
+                        return DaemonResponse {
+                            success: false,
+                            message: format!("App '{}' already exists", app_name),
+                        };
+                    }
+
+                    let port_desc: Vec<String> = port_rules
+                        .iter()
+                        .map(|p| format!("{}/{}", p.port, p.protocol))
+                        .collect();
+
+                    cfg.app.push(config::AppConfig {
+                        name: app_name.clone(),
+                        binary: binary.clone(),
+                        enabled: true,
+                        outbound: port_rules,
+                    });
+
+                    if let Err(e) = cfg.save(None) {
+                        return DaemonResponse {
+                            success: false,
+                            message: format!("Failed to save config: {}", e),
+                        };
+                    }
+                    if let Err(e) = state.reload_config(cfg) {
+                        return DaemonResponse {
+                            success: false,
+                            message: format!("Failed to reload: {}", e),
+                        };
+                    }
+
+                    state.clear_unknown(&binary);
+
+                    DaemonResponse {
+                        success: true,
+                        message: format!(
+                            "Approved '{}' with ports: {}",
+                            app_name,
+                            port_desc.join(", ")
+                        ),
+                    }
+                }
+                None => DaemonResponse {
+                    success: false,
+                    message: format!(
+                        "No pending connections for '{}'. Run `afw pending` to see blocked apps.",
+                        binary
+                    ),
+                },
             }
         }
         Command::Daemon => DaemonResponse {

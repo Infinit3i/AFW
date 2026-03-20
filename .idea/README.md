@@ -19,11 +19,11 @@
 - [x] Since default policy is drop, the connection is already blocked — no action needed to deny
 
 ### Phase 3: Desktop Notification
-- [ ] Send notification via `notify-send` / D-Bus when unknown app is detected
-- [ ] Notification shows: app name, binary, ports it tried to access
-- [ ] Action buttons: **Allow Once** / **Always Allow** / **Deny**
-- [ ] Fallback: if no desktop session, log to journal and allow CLI approval via `afw approve <name>`
-- [ ] Rate-limit notifications to prevent spam (max 1 per app per 30 seconds)
+- [x] Send notification via `notify-send` / D-Bus when unknown app is detected
+- [x] Notification shows: app name, binary, ports it tried to access
+- [ ] Action buttons: **Allow Once** / **Always Allow** / **Deny** (requires D-Bus action support per DE)
+- [x] Fallback: if no desktop session, log to journal and allow CLI approval via `afw approve <name>`
+- [x] Rate-limit notifications to prevent spam (max 1 per app per 30 seconds)
 
 ### Phase 4: User Response Handling
 - [ ] **Allow Once**: add temporary nft rules for this app (removed on app exit or daemon restart)
