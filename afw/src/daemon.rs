@@ -9,13 +9,12 @@ use afw_common::{EVENT_EXEC, EVENT_EXIT};
 use crate::config::Config;
 use crate::ebpf_loader;
 use crate::ipc;
-use crate::nft;
+use crate::nft::{NftBackend, RealNftBackend};
 use crate::state::AppState;
 
 pub async fn run() -> Result<()> {
     info!("AFW daemon starting...");
 
-    // Load configuration
     let config = Config::load(None).context("Failed to load configuration")?;
     info!(
         "Loaded config: {} base port rules, {} app rules",
@@ -23,28 +22,22 @@ pub async fn run() -> Result<()> {
         config.app.len()
     );
 
-    // Initialize nftables
-    nft::init_table(&config.base.outbound, config.base.icmp, config.base.loopback)
+    let nft = RealNftBackend;
+    nft.init_table(&config.base.outbound, config.base.icmp, config.base.loopback)
         .context("Failed to initialize nftables")?;
 
-    // Create shared state
     let mut state = AppState::new(config.clone());
-
-    // Scan for already-running processes
     state.scan_existing_processes()?;
 
     let state = Arc::new(Mutex::new(state));
 
-    // Create channel for eBPF events
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    // Load and attach eBPF programs
     let _bpf = ebpf_loader::load_and_attach(tx)
         .await
         .context("Failed to load eBPF programs")?;
     info!("eBPF programs loaded and attached");
 
-    // Start IPC server
     let ipc_state = Arc::clone(&state);
     tokio::spawn(async move {
         if let Err(e) = ipc::start_server(ipc_state).await {
@@ -52,13 +45,11 @@ pub async fn run() -> Result<()> {
         }
     });
 
-    // Set up signal handlers
     let mut sigterm = signal(SignalKind::terminate())?;
     let mut sigint = signal(SignalKind::interrupt())?;
 
     info!("AFW daemon ready. Monitoring process events...");
 
-    // Main event loop
     loop {
         tokio::select! {
             Some(event) = rx.recv() => {
@@ -89,9 +80,8 @@ pub async fn run() -> Result<()> {
         }
     }
 
-    // Cleanup
     info!("Cleaning up nftables rules...");
-    if let Err(e) = nft::cleanup() {
+    if let Err(e) = nft.cleanup() {
         warn!("Failed to cleanup nftables: {}. The ExecStopPost should handle it.", e);
     }
 

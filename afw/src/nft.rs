@@ -4,15 +4,69 @@ use std::process::Command;
 
 use crate::config::PortRule;
 
-const TABLE_NAME: &str = "afw";
-const TABLE_FAMILY: &str = "inet";
+/// Trait for nftables operations, enabling mock testing
+pub trait NftBackend: Send + Sync {
+    fn add_app_rules(&self, app_name: &str, ports: &[PortRule]) -> Result<()>;
+    fn remove_app_rules(&self, app_name: &str) -> Result<()>;
+    fn list_rules(&self) -> Result<String>;
+    fn init_table(&self, base_ports: &[PortRule], icmp: bool, loopback: bool) -> Result<()>;
+    fn cleanup(&self) -> Result<()>;
+}
 
-/// Initialize the AFW nftables table with base rules
-pub fn init_table(base_ports: &[PortRule], icmp: bool, loopback: bool) -> Result<()> {
-    // Delete existing table if present (clean slate)
-    let _ = run_nft("delete table inet afw");
+/// Real nftables backend that executes nft commands
+pub struct RealNftBackend;
 
-    // Build the full ruleset as an nft script
+impl NftBackend for RealNftBackend {
+    fn init_table(&self, base_ports: &[PortRule], icmp: bool, loopback: bool) -> Result<()> {
+        let _ = run_nft("delete table inet afw");
+        let rules = build_init_table_script(base_ports, icmp, loopback);
+        run_nft_stdin(&rules).context("Failed to initialize nftables table")?;
+        info!("nftables table 'inet afw' initialized with base rules");
+        Ok(())
+    }
+
+    fn add_app_rules(&self, app_name: &str, ports: &[PortRule]) -> Result<()> {
+        let rules = build_add_app_rules_script(app_name, ports);
+        if !rules.is_empty() {
+            run_nft_stdin(&rules)
+                .with_context(|| format!("Failed to add rules for app '{}'", app_name))?;
+            info!("Added nftables rules for app '{}'", app_name);
+        }
+        Ok(())
+    }
+
+    fn remove_app_rules(&self, app_name: &str) -> Result<()> {
+        let output = run_nft_output("-a list chain inet afw output")?;
+        let handles = parse_rule_handles(&output, app_name);
+
+        for handle in handles.iter().rev() {
+            let cmd = format!("delete rule inet afw output handle {}", handle);
+            if let Err(e) = run_nft(&cmd) {
+                error!("Failed to delete rule handle {}: {}", handle, e);
+            }
+        }
+
+        if !handles.is_empty() {
+            info!("Removed {} nftables rules for app '{}'", handles.len(), app_name);
+        }
+        Ok(())
+    }
+
+    fn list_rules(&self) -> Result<String> {
+        run_nft_output("list table inet afw")
+    }
+
+    fn cleanup(&self) -> Result<()> {
+        run_nft("delete table inet afw").context("Failed to delete nftables table")?;
+        info!("nftables table 'inet afw' removed");
+        Ok(())
+    }
+}
+
+// === Pure functions for script generation (testable without nft) ===
+
+/// Build the nft script for initializing the AFW table
+pub fn build_init_table_script(base_ports: &[PortRule], icmp: bool, loopback: bool) -> String {
     let mut rules = String::new();
 
     rules.push_str("table inet afw {\n");
@@ -31,7 +85,6 @@ pub fn init_table(base_ports: &[PortRule], icmp: bool, loopback: bool) -> Result
         rules.push_str("\n");
     }
 
-    // Base port rules
     rules.push_str("        # Base outbound rules (always allowed)\n");
     for port_rule in base_ports {
         rules.push_str(&format!("        {}\n", format_port_rule(port_rule)));
@@ -72,15 +125,12 @@ pub fn init_table(base_ports: &[PortRule], icmp: bool, loopback: bool) -> Result
     rules.push_str("    }\n");
     rules.push_str("}\n");
 
-    run_nft_stdin(&rules).context("Failed to initialize nftables table")?;
-    info!("nftables table 'inet afw' initialized with base rules");
-    Ok(())
+    rules
 }
 
-/// Add dynamic outbound rules for an application
-pub fn add_app_rules(app_name: &str, ports: &[PortRule]) -> Result<()> {
+/// Build the nft script for adding app rules
+pub fn build_add_app_rules_script(app_name: &str, ports: &[PortRule]) -> String {
     let mut rules = String::new();
-
     for port_rule in ports {
         let rule = format_port_rule(port_rule);
         rules.push_str(&format!(
@@ -88,26 +138,16 @@ pub fn add_app_rules(app_name: &str, ports: &[PortRule]) -> Result<()> {
             rule, app_name
         ));
     }
-
-    if !rules.is_empty() {
-        run_nft_stdin(&rules)
-            .with_context(|| format!("Failed to add rules for app '{}'", app_name))?;
-        info!("Added nftables rules for app '{}'", app_name);
-    }
-    Ok(())
+    rules
 }
 
-/// Remove dynamic outbound rules for an application
-pub fn remove_app_rules(app_name: &str) -> Result<()> {
-    // List rules with handles to find our tagged rules
-    let output = run_nft_output("list chain inet afw output -a")?;
-
+/// Parse nft rule listing output to extract handles for a given app
+pub fn parse_rule_handles(output: &str, app_name: &str) -> Vec<u64> {
     let comment_tag = format!("afw:{}", app_name);
     let mut handles = Vec::new();
 
     for line in output.lines() {
         if line.contains(&format!("comment \"{}\"", comment_tag)) {
-            // Extract handle number from "# handle N"
             if let Some(handle_str) = line.rsplit("# handle ").next() {
                 if let Ok(handle) = handle_str.trim().parse::<u64>() {
                     handles.push(handle);
@@ -116,30 +156,7 @@ pub fn remove_app_rules(app_name: &str) -> Result<()> {
         }
     }
 
-    // Remove rules by handle (in reverse order to keep handles valid)
-    for handle in handles.iter().rev() {
-        let cmd = format!("delete rule inet afw output handle {}", handle);
-        if let Err(e) = run_nft(&cmd) {
-            error!("Failed to delete rule handle {}: {}", handle, e);
-        }
-    }
-
-    if !handles.is_empty() {
-        info!("Removed {} nftables rules for app '{}'", handles.len(), app_name);
-    }
-    Ok(())
-}
-
-/// Clean up: delete the entire AFW table
-pub fn cleanup() -> Result<()> {
-    run_nft("delete table inet afw").context("Failed to delete nftables table")?;
-    info!("nftables table 'inet afw' removed");
-    Ok(())
-}
-
-/// Get current AFW rules as a string
-pub fn list_rules() -> Result<String> {
-    run_nft_output("list table inet afw")
+    handles
 }
 
 /// Format a PortRule into an nftables rule string
@@ -152,7 +169,8 @@ pub fn format_port_rule(rule: &PortRule) -> String {
     format!("{} dport {} accept", rule.protocol, port_spec)
 }
 
-/// Run an nft command
+// === Private nft command execution ===
+
 fn run_nft(args: &str) -> Result<()> {
     let status = Command::new("nft")
         .args(args.split_whitespace())
@@ -165,7 +183,6 @@ fn run_nft(args: &str) -> Result<()> {
     Ok(())
 }
 
-/// Run an nft command and capture output
 fn run_nft_output(args: &str) -> Result<String> {
     let output = Command::new("nft")
         .args(args.split_whitespace())
@@ -181,7 +198,6 @@ fn run_nft_output(args: &str) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-/// Run nft with rules from stdin
 fn run_nft_stdin(input: &str) -> Result<()> {
     use std::io::Write;
     use std::process::Stdio;

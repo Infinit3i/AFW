@@ -1,0 +1,64 @@
+# Creative & Design
+
+[[app]]
+name = "gimp"
+binary = "gimp-2.10"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Plugin downloads
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "blender"
+binary = "blender"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Extensions/updates
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "inkscape"
+binary = "inkscape"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Extension downloads
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "krita"
+binary = "krita"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "godot"
+binary = "godot"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Asset library/templates
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "kdenlive"
+binary = "kdenlive"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "darktable"
+binary = "darktable"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+]

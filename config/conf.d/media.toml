@@ -1,0 +1,112 @@
+# Media
+
+[[app]]
+name = "spotify"
+binary = "spotify"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # API/streaming
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 4070,  protocol = "tcp" },   # Spotify protocol
+    { port = 8443,  protocol = "tcp" },   # HTTPS alternate
+    { port = 57621, protocol = "udp" },   # Spotify Connect discovery
+]
+
+[[app]]
+name = "obs"
+binary = "obs"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Streaming (Twitch/YouTube)
+    { port = 80,   protocol = "tcp" },
+    { port = 1935, protocol = "tcp" },   # RTMP streaming
+    { port = 1936, protocol = "tcp" },   # RTMP alternate
+]
+
+[[app]]
+name = "vlc"
+binary = "vlc"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # HTTPS streams
+    { port = 80,   protocol = "tcp" },   # HTTP streams
+    { port = 554,  protocol = "tcp" },   # RTSP
+    { port = 1755, protocol = "tcp" },   # MMS
+    { port = 8000, protocol = "tcp" },   # Icecast
+    { port = 8080, protocol = "tcp" },   # HTTP alternate
+    { port = 5004, protocol = "udp" },   # RTP
+    { port = 5005, protocol = "udp" },   # RTCP
+]
+
+[[app]]
+name = "mpv"
+binary = "mpv"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # HTTPS streams
+    { port = 80,   protocol = "tcp" },   # HTTP streams
+    { port = 554,  protocol = "tcp" },   # RTSP
+    { port = 8080, protocol = "tcp" },   # HTTP alternate
+]
+
+[[app]]
+name = "kodi"
+binary = "kodi.bin"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Addons/HTTPS streams
+    { port = 80,   protocol = "tcp" },   # HTTP streams
+    { port = 554,  protocol = "tcp" },   # RTSP
+    { port = 1900, protocol = "udp" },   # UPnP/SSDP
+    { port = 8080, protocol = "tcp" },   # Web interface/streams
+    { port = 9090, protocol = "tcp" },   # JSON-RPC
+]
+
+[[app]]
+name = "jellyfin-media-player"
+binary = "jellyfinmediad"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8096, protocol = "tcp" },   # Jellyfin HTTP
+    { port = 8920, protocol = "tcp" },   # Jellyfin HTTPS
+]
+
+[[app]]
+name = "plex"
+binary = "Plex Media Pla"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },
+    { port = 80,    protocol = "tcp" },
+    { port = 32400, protocol = "tcp" },  # Plex media server
+    { port = 32469, protocol = "tcp" },  # Plex DLNA
+]
+
+[[app]]
+name = "tidal"
+binary = "tidal-hifi"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Streaming
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "audacity"
+binary = "audacity"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Plugin downloads/updates
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "handbrake"
+binary = "ghb"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Updates
+    { port = 80,   protocol = "tcp" },
+]

@@ -1,0 +1,105 @@
+# Browsers
+
+[[app]]
+name = "firefox"
+binary = "firefox"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # HTTPS
+    { port = 80,   protocol = "tcp" },   # HTTP
+    { port = 8080, protocol = "tcp" },   # HTTP alternate
+    { port = 8443, protocol = "tcp" },   # HTTPS alternate
+    { port = 2053, protocol = "tcp" },   # Cloudflare
+    { port = 2083, protocol = "tcp" },   # Cloudflare
+    { port = 5228, protocol = "tcp" },   # Google services
+]
+
+[[app]]
+name = "librewolf"
+binary = "librewolf"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8080, protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+    { port = 2053, protocol = "tcp" },
+    { port = 2083, protocol = "tcp" },
+    { port = 5228, protocol = "tcp" },
+]
+
+[[app]]
+name = "chromium"
+binary = "chromium"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8080, protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+    { port = 5228, protocol = "tcp" },   # Google push notifications
+    { port = 5229, protocol = "tcp" },   # Google services
+    { port = 5230, protocol = "tcp" },   # Google services
+]
+
+[[app]]
+name = "google-chrome"
+binary = "chrome"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8080, protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+    { port = 5228, protocol = "tcp" },
+    { port = 5229, protocol = "tcp" },
+    { port = 5230, protocol = "tcp" },
+]
+
+[[app]]
+name = "brave"
+binary = "brave"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8080, protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+    { port = 5228, protocol = "tcp" },
+]
+
+[[app]]
+name = "vivaldi"
+binary = "vivaldi-bin"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8080, protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+    { port = 5228, protocol = "tcp" },
+]
+
+[[app]]
+name = "tor-browser"
+binary = "tor"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # TLS entry nodes
+    { port = 80,   protocol = "tcp" },   # Non-TLS entry nodes
+    { port = 9001, protocol = "tcp" },   # Tor relay ORPort
+    { port = 9030, protocol = "tcp" },   # Tor directory
+    { port = 9050, protocol = "tcp" },   # SOCKS proxy
+    { port = 9150, protocol = "tcp" },   # Tor Browser SOCKS
+]
+
+[[app]]
+name = "qutebrowser"
+binary = "qutebrowser"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8080, protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+]

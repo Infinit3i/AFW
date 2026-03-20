@@ -1,0 +1,125 @@
+# Productivity
+
+[[app]]
+name = "obsidian"
+binary = "obsidian"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Sync/plugins
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "electron"
+binary = "electron"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+]
+
+[[app]]
+name = "notion"
+binary = "notion-app"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "logseq"
+binary = "Logseq"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "joplin"
+binary = "joplin"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Sync (Joplin Cloud/Nextcloud/WebDAV)
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "libreoffice"
+binary = "soffice.bin"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Extension downloads/updates
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "bitwarden"
+binary = "bitwarden"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Vault sync
+    { port = 80,   protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },   # Self-hosted
+]
+
+[[app]]
+name = "keepassxc"
+binary = "keepassxc"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Favicon downloads/updates
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "1password"
+binary = "1password"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Vault sync
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "nextcloud"
+binary = "nextcloud"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Sync
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "syncthing"
+binary = "syncthing"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # Relay servers
+    { port = 80,    protocol = "tcp" },
+    { port = 22000, protocol = "tcp" },   # Syncthing protocol
+    { port = 22000, protocol = "udp" },   # QUIC
+    { port = 21027, protocol = "udp" },   # Local discovery
+]
+
+[[app]]
+name = "dropbox"
+binary = "dropbox"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # Sync
+    { port = 80,    protocol = "tcp" },
+    { port = 17500, protocol = "tcp" },   # LAN sync
+    { port = 17500, protocol = "udp" },   # LAN discovery
+]
+
+[[app]]
+name = "megasync"
+binary = "megasync"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Sync
+    { port = 80,   protocol = "tcp" },
+]

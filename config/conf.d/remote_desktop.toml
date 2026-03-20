@@ -1,0 +1,72 @@
+# Remote Desktop & Access
+
+[[app]]
+name = "remmina"
+binary = "remmina"
+enabled = true
+outbound = [
+    { port = 3389, protocol = "tcp" },   # RDP
+    { port = 5900, range_end = 5910, protocol = "tcp" },  # VNC
+    { port = 22,   protocol = "tcp" },   # SSH
+    { port = 443,  protocol = "tcp" },   # HTTPS
+]
+
+[[app]]
+name = "rustdesk"
+binary = "rustdesk"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },
+    { port = 21115, protocol = "tcp" },  # NAT type test
+    { port = 21116, protocol = "tcp" },  # Relay/ID server
+    { port = 21116, protocol = "udp" },  # ID server
+    { port = 21117, protocol = "tcp" },  # Relay
+    { port = 21118, protocol = "tcp" },  # WebSocket
+    { port = 21119, protocol = "tcp" },  # WebSocket
+]
+
+[[app]]
+name = "anydesk"
+binary = "anydesk"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 6568, protocol = "tcp" },   # AnyDesk relay
+    { port = 7070, protocol = "tcp" },   # AnyDesk direct
+]
+
+[[app]]
+name = "parsec"
+binary = "parsecd"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },
+    { port = 80,    protocol = "tcp" },
+    { port = 8000,  range_end = 8020, protocol = "udp" },  # Streaming
+    { port = 9000,  range_end = 9020, protocol = "udp" },  # Streaming
+]
+
+[[app]]
+name = "moonlight"
+binary = "moonlight"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },
+    { port = 47984, protocol = "tcp" },  # HTTPS control
+    { port = 47989, protocol = "tcp" },  # HTTP control
+    { port = 48010, protocol = "tcp" },  # RTSP
+    { port = 47998, range_end = 48000, protocol = "udp" },  # Video/audio/control
+]
+
+[[app]]
+name = "sunshine"
+binary = "sunshine"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },
+    { port = 47984, protocol = "tcp" },
+    { port = 47989, protocol = "tcp" },
+    { port = 48010, protocol = "tcp" },
+    { port = 47998, range_end = 48000, protocol = "udp" },
+]

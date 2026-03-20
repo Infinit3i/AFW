@@ -1,9 +1,9 @@
 use anyhow::Result;
-use log::{debug, info, warn};
+use log::{debug, info};
 use std::collections::{HashMap, HashSet};
 
-use crate::config::{AppConfig, Config};
-use crate::nft;
+use crate::config::Config;
+use crate::nft::{NftBackend, RealNftBackend};
 
 /// Runtime state tracking active processes and their firewall rules
 pub struct AppState {
@@ -13,10 +13,16 @@ pub struct AppState {
     binary_map: HashMap<String, String>,
     /// Current config
     config: Config,
+    /// nftables backend
+    nft: Box<dyn NftBackend>,
 }
 
 impl AppState {
     pub fn new(config: Config) -> Self {
+        Self::with_backend(config, Box::new(RealNftBackend))
+    }
+
+    pub fn with_backend(config: Config, nft: Box<dyn NftBackend>) -> Self {
         let binary_map: HashMap<String, String> = config
             .app
             .iter()
@@ -28,15 +34,15 @@ impl AppState {
             active_pids: HashMap::new(),
             binary_map,
             config,
+            nft,
         }
     }
 
     /// Handle a process exec event
     pub fn handle_exec(&mut self, pid: u32, comm: &str) -> Result<()> {
-        // Check if this binary matches any configured app
         let app_name = match self.binary_map.get(comm) {
             Some(name) => name.clone(),
-            None => return Ok(()), // Not a monitored app
+            None => return Ok(()),
         };
 
         debug!("Monitored app exec: {} (pid {}, binary '{}')", app_name, pid, comm);
@@ -45,11 +51,10 @@ impl AppState {
         let was_empty = pids.is_empty();
         pids.insert(pid);
 
-        // First instance of this app: add firewall rules
         if was_empty {
             if let Some(app_config) = self.config.find_app_by_name(&app_name) {
                 info!("Opening ports for app '{}' (pid {})", app_name, pid);
-                nft::add_app_rules(&app_name, &app_config.outbound)?;
+                self.nft.add_app_rules(&app_name, &app_config.outbound)?;
             }
         } else {
             debug!(
@@ -78,10 +83,9 @@ impl AppState {
             false
         };
 
-        // Last instance exited: remove firewall rules
         if should_remove {
             info!("Closing ports for app '{}' (last instance pid {} exited)", app_name, pid);
-            nft::remove_app_rules(&app_name)?;
+            self.nft.remove_app_rules(&app_name)?;
             self.active_pids.remove(&app_name);
         }
 
@@ -97,7 +101,6 @@ impl AppState {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
 
-            // Only look at numeric directories (PIDs)
             if let Ok(pid) = name_str.parse::<u32>() {
                 let comm_path = format!("/proc/{}/comm", pid);
                 if let Ok(comm) = std::fs::read_to_string(&comm_path) {
@@ -114,7 +117,6 @@ impl AppState {
 
     /// Reload config and update state
     pub fn reload_config(&mut self, config: Config) -> Result<()> {
-        // Remove rules for apps that are no longer configured or disabled
         let old_apps: HashSet<String> = self.binary_map.values().cloned().collect();
         let new_binary_map: HashMap<String, String> = config
             .app
@@ -124,11 +126,10 @@ impl AppState {
             .collect();
         let new_apps: HashSet<String> = new_binary_map.values().cloned().collect();
 
-        // Remove rules for apps that were active but are now gone/disabled
         for app_name in old_apps.difference(&new_apps) {
             if self.active_pids.contains_key(app_name) {
                 info!("App '{}' removed/disabled in config, closing ports", app_name);
-                nft::remove_app_rules(app_name)?;
+                self.nft.remove_app_rules(app_name)?;
                 self.active_pids.remove(app_name);
             }
         }
@@ -136,7 +137,6 @@ impl AppState {
         self.config = config;
         self.binary_map = new_binary_map;
 
-        // Re-scan for any newly configured apps
         self.scan_existing_processes()?;
 
         info!("Config reloaded successfully");
@@ -187,5 +187,10 @@ impl AppState {
     /// Get config reference
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    /// Get nft backend reference
+    pub fn nft(&self) -> &dyn NftBackend {
+        &*self.nft
     }
 }

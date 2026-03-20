@@ -1,0 +1,37 @@
+# System Services
+
+[[app]]
+name = "systemd-resolve"
+binary = "systemd-resolve"
+enabled = true
+outbound = [
+    { port = 53,  protocol = "udp" },
+    { port = 53,  protocol = "tcp" },
+    { port = 853, protocol = "tcp" },    # DNS over TLS
+]
+
+[[app]]
+name = "systemd-timesync"
+binary = "systemd-timesyn"
+enabled = true
+outbound = [
+    { port = 123, protocol = "udp" },    # NTP
+]
+
+[[app]]
+name = "systemd-network"
+binary = "systemd-network"
+enabled = true
+outbound = [
+    { port = 67, protocol = "udp" },     # DHCP
+    { port = 68, protocol = "udp" },     # DHCP
+]
+
+[[app]]
+name = "iwd"
+binary = "iwd"
+enabled = true
+outbound = [
+    { port = 67, protocol = "udp" },     # DHCP
+    { port = 68, protocol = "udp" },     # DHCP
+]

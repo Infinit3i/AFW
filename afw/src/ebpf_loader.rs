@@ -4,7 +4,7 @@ use aya::programs::TracePoint;
 use aya::util::online_cpus;
 use aya::{Ebpf, EbpfLoader};
 use bytes::BytesMut;
-use log::{debug, error, info, warn};
+use log::{error, info};
 use tokio::sync::mpsc;
 
 use afw_common::ProcessEvent;

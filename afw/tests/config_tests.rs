@@ -393,14 +393,186 @@ fn config_save_creates_parent_dirs() {
 
 #[test]
 fn config_load_real_example() {
-    // Test loading the actual example config file
+    // Test loading the actual example config file + conf.d drop-ins
     let config = Config::load(Some(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../config/afw.toml"
     )));
     let config = config.unwrap();
-    assert_eq!(config.base.outbound.len(), 5);
+    assert_eq!(config.base.outbound.len(), 15);
     assert!(config.base.icmp);
     assert!(config.base.loopback);
-    assert!(config.app.len() >= 3); // discord, firefox, steam
+    // Apps come from conf.d/ drop-in files
+    assert!(config.app.len() >= 3);
+    // Verify some apps from different drop-in files are loaded
+    assert!(config.find_app_by_name("discord").is_some());
+    assert!(config.find_app_by_name("firefox").is_some());
+    assert!(config.find_app_by_name("steam").is_some());
+    assert!(config.find_app_by_name("wireguard").is_some());
+    assert!(config.find_app_by_name("spotify").is_some());
+}
+
+// === Drop-in config tests ===
+
+#[test]
+fn load_with_conf_d_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let conf_d = dir.path().join("conf.d");
+    std::fs::create_dir_all(&conf_d).unwrap();
+
+    // Write main config (base only)
+    let main_path = dir.path().join("afw.toml");
+    std::fs::write(&main_path, r#"
+[base]
+outbound = [{ port = 53, protocol = "udp" }]
+"#).unwrap();
+
+    // Write a drop-in
+    std::fs::write(conf_d.join("browsers.toml"), r#"
+[[app]]
+name = "firefox"
+binary = "firefox"
+outbound = [{ port = 443, protocol = "tcp" }]
+"#).unwrap();
+
+    // Write another drop-in
+    std::fs::write(conf_d.join("gaming.toml"), r#"
+[[app]]
+name = "steam"
+binary = "steam"
+outbound = [{ port = 80, protocol = "tcp" }]
+"#).unwrap();
+
+    let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
+    assert_eq!(config.base.outbound.len(), 1);
+    assert_eq!(config.app.len(), 2);
+    assert!(config.find_app_by_name("firefox").is_some());
+    assert!(config.find_app_by_name("steam").is_some());
+}
+
+#[test]
+fn load_without_conf_d_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let main_path = dir.path().join("afw.toml");
+    std::fs::write(&main_path, r#"
+[base]
+outbound = []
+
+[[app]]
+name = "test"
+binary = "test"
+outbound = []
+"#).unwrap();
+
+    // No conf.d/ directory — should still work fine
+    let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
+    assert_eq!(config.app.len(), 1);
+}
+
+#[test]
+fn drop_ins_loaded_alphabetically() {
+    let dir = tempfile::tempdir().unwrap();
+    let conf_d = dir.path().join("conf.d");
+    std::fs::create_dir_all(&conf_d).unwrap();
+
+    let main_path = dir.path().join("afw.toml");
+    std::fs::write(&main_path, "[base]\noutbound = []\n").unwrap();
+
+    std::fs::write(conf_d.join("b_second.toml"), r#"
+[[app]]
+name = "bravo"
+binary = "bravo"
+outbound = []
+"#).unwrap();
+
+    std::fs::write(conf_d.join("a_first.toml"), r#"
+[[app]]
+name = "alpha"
+binary = "alpha"
+outbound = []
+"#).unwrap();
+
+    let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
+    assert_eq!(config.app[0].name, "alpha");
+    assert_eq!(config.app[1].name, "bravo");
+}
+
+#[test]
+fn non_toml_files_in_conf_d_ignored() {
+    let dir = tempfile::tempdir().unwrap();
+    let conf_d = dir.path().join("conf.d");
+    std::fs::create_dir_all(&conf_d).unwrap();
+
+    let main_path = dir.path().join("afw.toml");
+    std::fs::write(&main_path, "[base]\noutbound = []\n").unwrap();
+
+    std::fs::write(conf_d.join("valid.toml"), r#"
+[[app]]
+name = "valid"
+binary = "valid"
+outbound = []
+"#).unwrap();
+
+    std::fs::write(conf_d.join("readme.md"), "# Not a config").unwrap();
+    std::fs::write(conf_d.join("backup.bak"), "junk").unwrap();
+
+    let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
+    assert_eq!(config.app.len(), 1);
+    assert_eq!(config.app[0].name, "valid");
+}
+
+#[test]
+fn save_apps_to_drop_in() {
+    let dir = tempfile::tempdir().unwrap();
+    let main_path = dir.path().join("afw.toml");
+    std::fs::write(&main_path, "[base]\noutbound = []\n").unwrap();
+
+    let apps = vec![
+        AppConfig {
+            name: "test_vpn".into(),
+            binary: "vpn_bin".into(),
+            enabled: true,
+            outbound: vec![PortRule { port: 1194, range_end: None, protocol: "udp".into() }],
+        },
+    ];
+
+    Config::save_apps_to_drop_in(&apps, "vpn_clients", Some(main_path.to_str().unwrap())).unwrap();
+
+    let drop_in_path = dir.path().join("conf.d").join("vpn_clients.toml");
+    assert!(drop_in_path.exists());
+
+    // Now load and verify it merges
+    let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
+    assert_eq!(config.app.len(), 1);
+    assert_eq!(config.app[0].name, "test_vpn");
+}
+
+#[test]
+fn main_config_apps_merge_with_drop_ins() {
+    let dir = tempfile::tempdir().unwrap();
+    let conf_d = dir.path().join("conf.d");
+    std::fs::create_dir_all(&conf_d).unwrap();
+
+    let main_path = dir.path().join("afw.toml");
+    std::fs::write(&main_path, r#"
+[base]
+outbound = []
+
+[[app]]
+name = "inline_app"
+binary = "inline"
+outbound = []
+"#).unwrap();
+
+    std::fs::write(conf_d.join("extra.toml"), r#"
+[[app]]
+name = "dropin_app"
+binary = "dropin"
+outbound = []
+"#).unwrap();
+
+    let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
+    assert_eq!(config.app.len(), 2);
+    assert!(config.find_app_by_name("inline_app").is_some());
+    assert!(config.find_app_by_name("dropin_app").is_some());
 }

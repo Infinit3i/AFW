@@ -1,0 +1,59 @@
+# File Transfer & Torrent Clients
+
+[[app]]
+name = "qbittorrent"
+binary = "qbittorrent"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # Trackers HTTPS
+    { port = 80,    protocol = "tcp" },   # Trackers HTTP
+    { port = 6881,  range_end = 6889, protocol = "tcp" },   # BitTorrent
+    { port = 6881,  range_end = 6889, protocol = "udp" },   # DHT
+    { port = 1337,  protocol = "udp" },   # Common tracker
+    { port = 6969,  protocol = "udp" },   # Common tracker
+]
+
+[[app]]
+name = "transmission"
+binary = "transmission-gt"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },
+    { port = 80,    protocol = "tcp" },
+    { port = 51413, protocol = "tcp" },  # Transmission default
+    { port = 51413, protocol = "udp" },  # DHT
+    { port = 6881,  range_end = 6889, protocol = "udp" },
+]
+
+[[app]]
+name = "deluge"
+binary = "deluged"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },
+    { port = 80,    protocol = "tcp" },
+    { port = 6881,  range_end = 6891, protocol = "tcp" },
+    { port = 6881,  range_end = 6891, protocol = "udp" },
+]
+
+[[app]]
+name = "filezilla"
+binary = "filezilla"
+enabled = true
+outbound = [
+    { port = 21,   protocol = "tcp" },   # FTP
+    { port = 22,   protocol = "tcp" },   # SFTP
+    { port = 990,  protocol = "tcp" },   # FTPS
+    { port = 443,  protocol = "tcp" },
+    { port = 1024, range_end = 65535, protocol = "tcp" },  # FTP passive mode
+]
+
+[[app]]
+name = "rclone"
+binary = "rclone"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Cloud storage APIs
+    { port = 80,   protocol = "tcp" },
+    { port = 22,   protocol = "tcp" },   # SFTP
+]

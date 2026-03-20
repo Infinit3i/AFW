@@ -1,0 +1,77 @@
+# VPN Clients
+
+[[app]]
+name = "wireguard"
+binary = "wg-quick"
+enabled = true
+outbound = [
+    { port = 51820, protocol = "udp" },  # WireGuard default
+    { port = 1, range_end = 65535, protocol = "udp" },  # Custom WG ports
+]
+
+[[app]]
+name = "openvpn"
+binary = "openvpn"
+enabled = true
+outbound = [
+    { port = 1194, protocol = "udp" },   # OpenVPN default UDP
+    { port = 1194, protocol = "tcp" },   # OpenVPN default TCP
+    { port = 443,  protocol = "tcp" },   # OpenVPN over HTTPS
+    { port = 1195, range_end = 1200, protocol = "udp" },  # Alternate ports
+]
+
+[[app]]
+name = "protonvpn"
+binary = "protonvpn"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # API/IKEv2
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 1194,  protocol = "udp" },   # OpenVPN
+    { port = 1194,  protocol = "tcp" },   # OpenVPN
+    { port = 4569,  protocol = "udp" },   # Proton alternate
+    { port = 5060,  protocol = "udp" },   # Proton alternate
+    { port = 51820, protocol = "udp" },   # WireGuard
+    { port = 500,   protocol = "udp" },   # IKEv2
+    { port = 4500,  protocol = "udp" },   # IKEv2 NAT-T
+]
+
+[[app]]
+name = "mullvad"
+binary = "mullvad-daemon"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # API/tunnel
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 51820, protocol = "udp" },   # WireGuard
+    { port = 1194,  protocol = "udp" },   # OpenVPN
+    { port = 1194,  protocol = "tcp" },   # OpenVPN
+    { port = 1300,  range_end = 1400, protocol = "udp" },  # Mullvad WG ports
+    { port = 53,    protocol = "udp" },   # Mullvad DNS
+]
+
+[[app]]
+name = "nordvpn"
+binary = "nordvpn"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # API/tunnel
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 1194,  protocol = "udp" },   # OpenVPN
+    { port = 1194,  protocol = "tcp" },   # OpenVPN
+    { port = 51820, protocol = "udp" },   # NordLynx (WireGuard)
+    { port = 500,   protocol = "udp" },   # IKEv2
+    { port = 4500,  protocol = "udp" },   # IKEv2 NAT-T
+]
+
+[[app]]
+name = "tailscale"
+binary = "tailscaled"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # Control plane
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 41641, protocol = "udp" },   # Direct WireGuard
+    { port = 3478,  protocol = "udp" },   # STUN/DERP
+    { port = 443,   protocol = "udp" },   # QUIC fallback
+]

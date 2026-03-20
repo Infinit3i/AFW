@@ -1,0 +1,51 @@
+# Virtualization
+
+[[app]]
+name = "virtualbox"
+binary = "VirtualBox"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Extension pack updates
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "virt-manager"
+binary = "virt-manager"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 16509, protocol = "tcp" },  # libvirtd remote
+]
+
+[[app]]
+name = "qemu"
+binary = "qemu-system-x8"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 5900, range_end = 5910, protocol = "tcp" },  # VNC
+    { port = 3389, protocol = "tcp" },   # RDP
+]
+
+[[app]]
+name = "gnome-boxes"
+binary = "gnome-boxes"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "vmware"
+binary = "vmware"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Updates/licensing
+    { port = 80,   protocol = "tcp" },
+    { port = 902,  protocol = "tcp" },   # VMware console
+    { port = 903,  protocol = "tcp" },   # VMware remote MKS
+]

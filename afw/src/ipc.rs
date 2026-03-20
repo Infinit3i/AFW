@@ -8,7 +8,6 @@ use tokio::sync::Mutex;
 
 use crate::cli::{Command, DaemonResponse};
 use crate::config::{self, Config};
-use crate::nft;
 use crate::state::AppState;
 
 const SOCKET_PATH: &str = "/run/afw/afw.sock";
@@ -206,7 +205,8 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
             }
         }
         Command::Rules => {
-            match nft::list_rules() {
+            let state = state.lock().await;
+            match state.nft().list_rules() {
                 Ok(rules) => DaemonResponse {
                     success: true,
                     message: rules,

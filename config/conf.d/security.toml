@@ -1,0 +1,10 @@
+# Security
+
+[[app]]
+name = "freshclam"
+binary = "freshclam"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # HTTPS updates
+    { port = 80,   protocol = "tcp" },   # HTTP updates
+]

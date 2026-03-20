@@ -1,13 +1,21 @@
 use anyhow::{Context, Result};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const DEFAULT_CONFIG_PATH: &str = "/etc/afw/afw.toml";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub base: BaseConfig,
+    #[serde(default)]
+    pub app: Vec<AppConfig>,
+}
+
+/// A drop-in config file that only contains app rules
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DropInConfig {
     #[serde(default)]
     pub app: Vec<AppConfig>,
 }
@@ -61,28 +69,74 @@ fn default_base_ports() -> Vec<PortRule> {
     ]
 }
 
+/// Resolve the conf.d directory path relative to a config file path
+fn conf_dir_for(config_path: &str) -> PathBuf {
+    Path::new(config_path)
+        .parent()
+        .unwrap_or(Path::new("/etc/afw"))
+        .join("conf.d")
+}
+
 impl Config {
-    /// Load config from the default path or a specified path
+    /// Load the main config and merge in all conf.d/*.toml drop-in files
     pub fn load(path: Option<&str>) -> Result<Self> {
         let config_path = path.unwrap_or(DEFAULT_CONFIG_PATH);
         let contents = std::fs::read_to_string(config_path)
             .with_context(|| format!("Failed to read config: {}", config_path))?;
-        let config: Config = toml::from_str(&contents)
+        let mut config: Config = toml::from_str(&contents)
             .with_context(|| format!("Failed to parse config: {}", config_path))?;
+
+        // Load drop-in configs from conf.d/
+        let conf_dir = conf_dir_for(config_path);
+        if conf_dir.is_dir() {
+            let mut files: Vec<PathBuf> = std::fs::read_dir(&conf_dir)?
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.extension().is_some_and(|ext| ext == "toml"))
+                .collect();
+            files.sort(); // Alphabetical order for predictability
+
+            for file in &files {
+                let file_str = file.to_string_lossy();
+                let contents = std::fs::read_to_string(file)
+                    .with_context(|| format!("Failed to read drop-in config: {}", file_str))?;
+                let drop_in: DropInConfig = toml::from_str(&contents)
+                    .with_context(|| format!("Failed to parse drop-in config: {}", file_str))?;
+                info!("Loaded drop-in config: {} ({} apps)", file_str, drop_in.app.len());
+                config.app.extend(drop_in.app);
+            }
+        }
+
         Ok(config)
     }
 
-    /// Save config to disk
+    /// Save the base config to the main file (does not touch conf.d/)
     pub fn save(&self, path: Option<&str>) -> Result<()> {
         let config_path = path.unwrap_or(DEFAULT_CONFIG_PATH);
         let contents = toml::to_string_pretty(self)
             .context("Failed to serialize config")?;
-        // Ensure parent directory exists
         if let Some(parent) = Path::new(config_path).parent() {
             std::fs::create_dir_all(parent)?;
         }
         std::fs::write(config_path, contents)
             .with_context(|| format!("Failed to write config: {}", config_path))?;
+        Ok(())
+    }
+
+    /// Save a full config split across the main file (base only) and conf.d/ drop-ins.
+    /// Apps are written to the specified drop-in file name.
+    pub fn save_apps_to_drop_in(apps: &[AppConfig], drop_in_name: &str, path: Option<&str>) -> Result<()> {
+        let config_path = path.unwrap_or(DEFAULT_CONFIG_PATH);
+        let conf_dir = conf_dir_for(config_path);
+        std::fs::create_dir_all(&conf_dir)?;
+
+        let drop_in = DropInConfig { app: apps.to_vec() };
+        let contents = toml::to_string_pretty(&drop_in)
+            .context("Failed to serialize drop-in config")?;
+
+        let drop_in_path = conf_dir.join(format!("{}.toml", drop_in_name));
+        std::fs::write(&drop_in_path, &contents)
+            .with_context(|| format!("Failed to write drop-in: {}", drop_in_path.display()))?;
         Ok(())
     }
 
@@ -94,6 +148,11 @@ impl Config {
     /// Find app config by name
     pub fn find_app_by_name(&self, name: &str) -> Option<&AppConfig> {
         self.app.iter().find(|a| a.name == name)
+    }
+
+    /// Find mutable app config by name
+    pub fn find_app_by_name_mut(&mut self, name: &str) -> Option<&mut AppConfig> {
+        self.app.iter_mut().find(|a| a.name == name)
     }
 
     /// Build a lookup map: binary name -> app config index

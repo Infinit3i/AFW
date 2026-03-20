@@ -1,0 +1,83 @@
+# Gaming
+
+[[app]]
+name = "steam"
+binary = "steam"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # Store/API
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 8443,  protocol = "tcp" },   # HTTPS alternate
+    { port = 27015, range_end = 27050, protocol = "udp" },  # Game traffic
+    { port = 27015, range_end = 27050, protocol = "tcp" },  # Game traffic
+    { port = 4380,  protocol = "udp" },   # Steam P2P
+    { port = 3478,  protocol = "udp" },   # STUN/NAT traversal
+]
+
+[[app]]
+name = "lutris"
+binary = "lutris"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Game downloads/API
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "heroic"
+binary = "heroic"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Epic/GOG stores
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "bottles"
+binary = "bottles"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Dependency downloads
+    { port = 80,   protocol = "tcp" },
+]
+
+[[app]]
+name = "minecraft"
+binary = "java"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # Auth/API
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 25565, protocol = "tcp" },   # Minecraft server default
+    { port = 25565, protocol = "udp" },   # Minecraft Bedrock
+    { port = 19132, protocol = "udp" },   # Bedrock default
+]
+
+[[app]]
+name = "retroarch"
+binary = "retroarch"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Core/asset downloads
+    { port = 80,   protocol = "tcp" },
+    { port = 55435, protocol = "udp" },  # Netplay
+]
+
+[[app]]
+name = "prism-launcher"
+binary = "prismlauncher"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # Auth/mod downloads
+    { port = 80,    protocol = "tcp" },
+    { port = 25565, protocol = "tcp" },   # MC server
+]
+
+[[app]]
+name = "gamemode"
+binary = "gamemoded"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+]
