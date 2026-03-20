@@ -51,7 +51,11 @@ impl NftBackend for RealNftBackend {
         }
 
         if !handles.is_empty() {
-            info!("Removed {} nftables rules for app '{}'", handles.len(), app_name);
+            info!(
+                "Removed {} nftables rules for app '{}'",
+                handles.len(),
+                app_name
+            );
         }
         Ok(())
     }
@@ -78,52 +82,52 @@ pub fn build_init_table_script(base_ports: &[PortRule], icmp: bool, loopback: bo
     // Output chain - default drop
     rules.push_str("    chain output {\n");
     rules.push_str("        type filter hook output priority 0; policy drop;\n");
-    rules.push_str("\n");
+    rules.push('\n');
     rules.push_str("        # Allow established/related connections\n");
     rules.push_str("        ct state established,related accept\n");
-    rules.push_str("\n");
+    rules.push('\n');
 
     if loopback {
         rules.push_str("        # Allow loopback\n");
         rules.push_str("        oif lo accept\n");
-        rules.push_str("\n");
+        rules.push('\n');
     }
 
     rules.push_str("        # Base outbound rules (always allowed)\n");
     for port_rule in base_ports {
         rules.push_str(&format!("        {}\n", format_port_rule(port_rule)));
     }
-    rules.push_str("\n");
+    rules.push('\n');
 
     if icmp {
         rules.push_str("        # ICMP\n");
         rules.push_str("        meta l4proto icmp accept\n");
         rules.push_str("        meta l4proto icmpv6 accept\n");
-        rules.push_str("\n");
+        rules.push('\n');
     }
 
     rules.push_str("    }\n");
-    rules.push_str("\n");
+    rules.push('\n');
 
     // Input chain - default drop
     rules.push_str("    chain input {\n");
     rules.push_str("        type filter hook input priority 0; policy drop;\n");
-    rules.push_str("\n");
+    rules.push('\n');
     rules.push_str("        # Allow established/related connections\n");
     rules.push_str("        ct state established,related accept\n");
-    rules.push_str("\n");
+    rules.push('\n');
 
     if loopback {
         rules.push_str("        # Allow loopback\n");
         rules.push_str("        iif lo accept\n");
-        rules.push_str("\n");
+        rules.push('\n');
     }
 
     if icmp {
         rules.push_str("        # ICMP\n");
         rules.push_str("        meta l4proto icmp accept\n");
         rules.push_str("        meta l4proto icmpv6 accept\n");
-        rules.push_str("\n");
+        rules.push('\n');
     }
 
     rules.push_str("    }\n");
@@ -222,10 +226,7 @@ fn run_nft_stdin(input: &str) -> Result<()> {
 
     let output = child.wait_with_output()?;
     if !output.status.success() {
-        anyhow::bail!(
-            "nft failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        anyhow::bail!("nft failed: {}", String::from_utf8_lossy(&output.stderr));
     }
     Ok(())
 }

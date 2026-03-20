@@ -7,8 +7,8 @@ use afw::state::AppState;
 // === Mock NftBackend ===
 
 struct MockNft {
-    added: Mutex<Vec<(String, usize)>>,    // (app_name, port_count)
-    removed: Mutex<Vec<String>>,           // app_name
+    added: Mutex<Vec<(String, usize)>>, // (app_name, port_count)
+    removed: Mutex<Vec<String>>,        // app_name
     fail_add: Mutex<bool>,
     fail_remove: Mutex<bool>,
 }
@@ -37,7 +37,10 @@ impl NftBackend for MockNft {
         if *self.fail_add.lock().unwrap() {
             anyhow::bail!("mock add failure");
         }
-        self.added.lock().unwrap().push((app_name.to_string(), ports.len()));
+        self.added
+            .lock()
+            .unwrap()
+            .push((app_name.to_string(), ports.len()));
         Ok(())
     }
 
@@ -53,7 +56,12 @@ impl NftBackend for MockNft {
         Ok("mock rules".into())
     }
 
-    fn init_table(&self, _base_ports: &[PortRule], _icmp: bool, _loopback: bool) -> anyhow::Result<()> {
+    fn init_table(
+        &self,
+        _base_ports: &[PortRule],
+        _icmp: bool,
+        _loopback: bool,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -67,9 +75,11 @@ impl NftBackend for MockNft {
 fn test_config() -> Config {
     Config {
         base: BaseConfig {
-            outbound: vec![
-                PortRule { port: 53, range_end: None, protocol: "udp".into() },
-            ],
+            outbound: vec![PortRule {
+                port: 53,
+                range_end: None,
+                protocol: "udp".into(),
+            }],
             icmp: true,
             loopback: true,
         },
@@ -79,25 +89,37 @@ fn test_config() -> Config {
                 binary: "Discord".into(),
                 enabled: true,
                 outbound: vec![
-                    PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-                    PortRule { port: 80, range_end: None, protocol: "tcp".into() },
+                    PortRule {
+                        port: 443,
+                        range_end: None,
+                        protocol: "tcp".into(),
+                    },
+                    PortRule {
+                        port: 80,
+                        range_end: None,
+                        protocol: "tcp".into(),
+                    },
                 ],
             },
             AppConfig {
                 name: "firefox".into(),
                 binary: "firefox".into(),
                 enabled: true,
-                outbound: vec![
-                    PortRule { port: 80, range_end: None, protocol: "tcp".into() },
-                ],
+                outbound: vec![PortRule {
+                    port: 80,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                }],
             },
             AppConfig {
                 name: "steam".into(),
                 binary: "steam".into(),
                 enabled: false,
-                outbound: vec![
-                    PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-                ],
+                outbound: vec![PortRule {
+                    port: 443,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                }],
             },
         ],
     }
@@ -344,7 +366,9 @@ fn status_info_contains_header() {
 #[test]
 fn status_info_no_running_apps_message() {
     let state = mock_state();
-    assert!(state.status_info().contains("No monitored applications currently running."));
+    assert!(state
+        .status_info()
+        .contains("No monitored applications currently running."));
 }
 
 #[test]
@@ -384,7 +408,9 @@ fn status_info_after_all_exit() {
     state.handle_exec(1000, "Discord").unwrap();
     state.handle_exit(1000, "Discord").unwrap();
 
-    assert!(state.status_info().contains("No monitored applications currently running."));
+    assert!(state
+        .status_info()
+        .contains("No monitored applications currently running."));
 }
 
 // === Config access ===
@@ -595,8 +621,16 @@ fn status_info_shows_port_range_format() {
             binary: "game_bin".into(),
             enabled: true,
             outbound: vec![
-                PortRule { port: 27015, range_end: Some(27050), protocol: "udp".into() },
-                PortRule { port: 443, range_end: None, protocol: "tcp".into() },
+                PortRule {
+                    port: 27015,
+                    range_end: Some(27050),
+                    protocol: "udp".into(),
+                },
+                PortRule {
+                    port: 443,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                },
             ],
         }],
     };
@@ -604,7 +638,11 @@ fn status_info_shows_port_range_format() {
     state.handle_exec(1000, "game_bin").unwrap();
 
     let status = state.status_info();
-    assert!(status.contains("27015-27050/udp"), "Should show range format: {}", status);
+    assert!(
+        status.contains("27015-27050/udp"),
+        "Should show range format: {}",
+        status
+    );
     assert!(status.contains("443/tcp"));
 }
 
@@ -621,10 +659,26 @@ fn status_info_shows_multiple_port_ranges() {
             binary: "complex".into(),
             enabled: true,
             outbound: vec![
-                PortRule { port: 80, range_end: None, protocol: "tcp".into() },
-                PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-                PortRule { port: 5000, range_end: Some(6000), protocol: "tcp".into() },
-                PortRule { port: 50000, range_end: Some(50100), protocol: "udp".into() },
+                PortRule {
+                    port: 80,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                },
+                PortRule {
+                    port: 443,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                },
+                PortRule {
+                    port: 5000,
+                    range_end: Some(6000),
+                    protocol: "tcp".into(),
+                },
+                PortRule {
+                    port: 50000,
+                    range_end: Some(50100),
+                    protocol: "udp".into(),
+                },
             ],
         }],
     };
@@ -804,5 +858,7 @@ fn full_lifecycle_three_apps_simultaneous() {
     state.handle_exit(201, "firefox").unwrap();
 
     assert!(state.status_info().contains("Active apps:    0"));
-    assert!(state.status_info().contains("No monitored applications currently running."));
+    assert!(state
+        .status_info()
+        .contains("No monitored applications currently running."));
 }

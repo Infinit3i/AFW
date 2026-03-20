@@ -10,19 +10,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
 
       - name: Install Rust nightly (for eBPF)
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rust-src
+
+      - name: Set stable as default
+        run: rustup default stable
 
       - name: Cache cargo registry & build
         uses: actions/cache@v4
@@ -31,52 +36,20 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build eBPF programs
         run: cargo xtask build-ebpf --release
+
+      - name: Check formatting
+        run: cargo fmt --package afw -- --check
+
+      - name: Run clippy
+        run: cargo clippy --package afw -- -D warnings
 
       - name: Build userspace
         run: cargo build --package afw --release
 
       - name: Run tests
         run: cargo test --package afw
-
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-clippy-
-
-      - name: Run clippy on afw crate
-        run: cargo clippy --package afw -- -D warnings
-
-  fmt:
-    name: Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Check formatting
-        run: cargo fmt --package afw -- --check

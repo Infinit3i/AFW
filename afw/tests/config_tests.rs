@@ -6,8 +6,16 @@ fn sample_config() -> Config {
     Config {
         base: BaseConfig {
             outbound: vec![
-                PortRule { port: 53, range_end: None, protocol: "udp".into() },
-                PortRule { port: 443, range_end: None, protocol: "tcp".into() },
+                PortRule {
+                    port: 53,
+                    range_end: None,
+                    protocol: "udp".into(),
+                },
+                PortRule {
+                    port: 443,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                },
             ],
             icmp: true,
             loopback: true,
@@ -18,25 +26,37 @@ fn sample_config() -> Config {
                 binary: "Discord".into(),
                 enabled: true,
                 outbound: vec![
-                    PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-                    PortRule { port: 50000, range_end: Some(50100), protocol: "udp".into() },
+                    PortRule {
+                        port: 443,
+                        range_end: None,
+                        protocol: "tcp".into(),
+                    },
+                    PortRule {
+                        port: 50000,
+                        range_end: Some(50100),
+                        protocol: "udp".into(),
+                    },
                 ],
             },
             AppConfig {
                 name: "steam".into(),
                 binary: "steam".into(),
                 enabled: false,
-                outbound: vec![
-                    PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-                ],
+                outbound: vec![PortRule {
+                    port: 443,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                }],
             },
             AppConfig {
                 name: "firefox".into(),
                 binary: "firefox".into(),
                 enabled: true,
-                outbound: vec![
-                    PortRule { port: 80, range_end: None, protocol: "tcp".into() },
-                ],
+                outbound: vec![PortRule {
+                    port: 80,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                }],
             },
         ],
     }
@@ -460,7 +480,11 @@ fn drop_in_empty_file() {
 fn config_serde_preserves_range_end_none() {
     let config = Config {
         base: BaseConfig {
-            outbound: vec![PortRule { port: 443, range_end: None, protocol: "tcp".into() }],
+            outbound: vec![PortRule {
+                port: 443,
+                range_end: None,
+                protocol: "tcp".into(),
+            }],
             icmp: true,
             loopback: true,
         },
@@ -482,26 +506,38 @@ fn load_with_conf_d_directory() {
 
     // Write main config (base only)
     let main_path = dir.path().join("afw.toml");
-    std::fs::write(&main_path, r#"
+    std::fs::write(
+        &main_path,
+        r#"
 [base]
 outbound = [{ port = 53, protocol = "udp" }]
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Write a drop-in
-    std::fs::write(conf_d.join("browsers.toml"), r#"
+    std::fs::write(
+        conf_d.join("browsers.toml"),
+        r#"
 [[app]]
 name = "firefox"
 binary = "firefox"
 outbound = [{ port = 443, protocol = "tcp" }]
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     // Write another drop-in
-    std::fs::write(conf_d.join("gaming.toml"), r#"
+    std::fs::write(
+        conf_d.join("gaming.toml"),
+        r#"
 [[app]]
 name = "steam"
 binary = "steam"
 outbound = [{ port = 80, protocol = "tcp" }]
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
     assert_eq!(config.base.outbound.len(), 1);
@@ -514,7 +550,9 @@ outbound = [{ port = 80, protocol = "tcp" }]
 fn load_without_conf_d_directory() {
     let dir = tempfile::tempdir().unwrap();
     let main_path = dir.path().join("afw.toml");
-    std::fs::write(&main_path, r#"
+    std::fs::write(
+        &main_path,
+        r#"
 [base]
 outbound = []
 
@@ -522,7 +560,9 @@ outbound = []
 name = "test"
 binary = "test"
 outbound = []
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     // No conf.d/ directory — should still work fine
     let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
@@ -538,19 +578,27 @@ fn drop_ins_loaded_alphabetically() {
     let main_path = dir.path().join("afw.toml");
     std::fs::write(&main_path, "[base]\noutbound = []\n").unwrap();
 
-    std::fs::write(conf_d.join("b_second.toml"), r#"
+    std::fs::write(
+        conf_d.join("b_second.toml"),
+        r#"
 [[app]]
 name = "bravo"
 binary = "bravo"
 outbound = []
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
-    std::fs::write(conf_d.join("a_first.toml"), r#"
+    std::fs::write(
+        conf_d.join("a_first.toml"),
+        r#"
 [[app]]
 name = "alpha"
 binary = "alpha"
 outbound = []
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
     assert_eq!(config.app[0].name, "alpha");
@@ -566,12 +614,16 @@ fn non_toml_files_in_conf_d_ignored() {
     let main_path = dir.path().join("afw.toml");
     std::fs::write(&main_path, "[base]\noutbound = []\n").unwrap();
 
-    std::fs::write(conf_d.join("valid.toml"), r#"
+    std::fs::write(
+        conf_d.join("valid.toml"),
+        r#"
 [[app]]
 name = "valid"
 binary = "valid"
 outbound = []
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     std::fs::write(conf_d.join("readme.md"), "# Not a config").unwrap();
     std::fs::write(conf_d.join("backup.bak"), "junk").unwrap();
@@ -587,14 +639,16 @@ fn save_apps_to_drop_in() {
     let main_path = dir.path().join("afw.toml");
     std::fs::write(&main_path, "[base]\noutbound = []\n").unwrap();
 
-    let apps = vec![
-        AppConfig {
-            name: "test_vpn".into(),
-            binary: "vpn_bin".into(),
-            enabled: true,
-            outbound: vec![PortRule { port: 1194, range_end: None, protocol: "udp".into() }],
-        },
-    ];
+    let apps = vec![AppConfig {
+        name: "test_vpn".into(),
+        binary: "vpn_bin".into(),
+        enabled: true,
+        outbound: vec![PortRule {
+            port: 1194,
+            range_end: None,
+            protocol: "udp".into(),
+        }],
+    }];
 
     Config::save_apps_to_drop_in(&apps, "vpn_clients", Some(main_path.to_str().unwrap())).unwrap();
 
@@ -614,7 +668,9 @@ fn main_config_apps_merge_with_drop_ins() {
     std::fs::create_dir_all(&conf_d).unwrap();
 
     let main_path = dir.path().join("afw.toml");
-    std::fs::write(&main_path, r#"
+    std::fs::write(
+        &main_path,
+        r#"
 [base]
 outbound = []
 
@@ -622,14 +678,20 @@ outbound = []
 name = "inline_app"
 binary = "inline"
 outbound = []
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
-    std::fs::write(conf_d.join("extra.toml"), r#"
+    std::fs::write(
+        conf_d.join("extra.toml"),
+        r#"
 [[app]]
 name = "dropin_app"
 binary = "dropin"
 outbound = []
-"#).unwrap();
+"#,
+    )
+    .unwrap();
 
     let config = Config::load(Some(main_path.to_str().unwrap())).unwrap();
     assert_eq!(config.app.len(), 2);
@@ -682,16 +744,16 @@ outbound = [{ port = 80, protocol = "tcp" }]
 #[test]
 fn drop_in_config_roundtrip_serialization() {
     let drop_in = DropInConfig {
-        app: vec![
-            AppConfig {
-                name: "vpn".into(),
-                binary: "openvpn".into(),
-                enabled: true,
-                outbound: vec![
-                    PortRule { port: 1194, range_end: None, protocol: "udp".into() },
-                ],
-            },
-        ],
+        app: vec![AppConfig {
+            name: "vpn".into(),
+            binary: "openvpn".into(),
+            enabled: true,
+            outbound: vec![PortRule {
+                port: 1194,
+                range_end: None,
+                protocol: "udp".into(),
+            }],
+        }],
     };
     let serialized = toml::to_string_pretty(&drop_in).unwrap();
     let deserialized: DropInConfig = toml::from_str(&serialized).unwrap();
@@ -810,14 +872,26 @@ fn config_many_apps_serialization_roundtrip() {
             binary: format!("bin_{}", i),
             enabled: true,
             outbound: vec![
-                PortRule { port: 80 + i as u16, range_end: None, protocol: "tcp".into() },
-                PortRule { port: 5000, range_end: Some(5000 + i as u16 + 1), protocol: "udp".into() },
+                PortRule {
+                    port: 80 + i as u16,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                },
+                PortRule {
+                    port: 5000,
+                    range_end: Some(5000 + i as u16 + 1),
+                    protocol: "udp".into(),
+                },
             ],
         })
         .collect();
     let config = Config {
         base: BaseConfig {
-            outbound: vec![PortRule { port: 53, range_end: None, protocol: "udp".into() }],
+            outbound: vec![PortRule {
+                port: 53,
+                range_end: None,
+                protocol: "udp".into(),
+            }],
             icmp: true,
             loopback: false,
         },
@@ -845,8 +919,16 @@ fn save_apps_to_drop_in_roundtrip_multiple_apps() {
             binary: "firefox".into(),
             enabled: true,
             outbound: vec![
-                PortRule { port: 80, range_end: None, protocol: "tcp".into() },
-                PortRule { port: 443, range_end: None, protocol: "tcp".into() },
+                PortRule {
+                    port: 80,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                },
+                PortRule {
+                    port: 443,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                },
             ],
         },
         AppConfig {
@@ -854,8 +936,16 @@ fn save_apps_to_drop_in_roundtrip_multiple_apps() {
             binary: "Discord".into(),
             enabled: false,
             outbound: vec![
-                PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-                PortRule { port: 50000, range_end: Some(50100), protocol: "udp".into() },
+                PortRule {
+                    port: 443,
+                    range_end: None,
+                    protocol: "tcp".into(),
+                },
+                PortRule {
+                    port: 50000,
+                    range_end: Some(50100),
+                    protocol: "udp".into(),
+                },
             ],
         },
     ];
@@ -904,7 +994,11 @@ fn save_apps_to_drop_in_overwrites_existing() {
         name: "new_app".into(),
         binary: "new".into(),
         enabled: true,
-        outbound: vec![PortRule { port: 8080, range_end: None, protocol: "tcp".into() }],
+        outbound: vec![PortRule {
+            port: 8080,
+            range_end: None,
+            protocol: "tcp".into(),
+        }],
     }];
     Config::save_apps_to_drop_in(&apps_v2, "test_file", Some(main_path.to_str().unwrap())).unwrap();
 
@@ -967,8 +1061,15 @@ fn find_app_by_name_mut_not_found() {
 fn find_app_by_name_mut_modify_outbound() {
     let mut config = sample_config();
     let app = config.find_app_by_name_mut("firefox").unwrap();
-    app.outbound.push(PortRule { port: 443, range_end: None, protocol: "tcp".into() });
-    assert_eq!(config.find_app_by_name("firefox").unwrap().outbound.len(), 2);
+    app.outbound.push(PortRule {
+        port: 443,
+        range_end: None,
+        protocol: "tcp".into(),
+    });
+    assert_eq!(
+        config.find_app_by_name("firefox").unwrap().outbound.len(),
+        2
+    );
 }
 
 #[test]
@@ -976,6 +1077,9 @@ fn find_app_by_name_mut_rename_binary() {
     let mut config = sample_config();
     let app = config.find_app_by_name_mut("discord").unwrap();
     app.binary = "discord-canary".into();
-    assert_eq!(config.find_app_by_binary("discord-canary").unwrap().name, "discord");
+    assert_eq!(
+        config.find_app_by_binary("discord-canary").unwrap().name,
+        "discord"
+    );
     assert!(config.find_app_by_binary("Discord").is_none());
 }

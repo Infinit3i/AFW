@@ -28,7 +28,11 @@ fn serialize_add_command() {
     let json = serde_json::to_string(&cmd).unwrap();
     let deserialized: Command = serde_json::from_str(&json).unwrap();
     match deserialized {
-        Command::Add { name, binary, ports } => {
+        Command::Add {
+            name,
+            binary,
+            ports,
+        } => {
             assert_eq!(name, "test");
             assert_eq!(binary, "test_bin");
             assert_eq!(ports, vec!["443/tcp", "80/tcp"]);
@@ -39,7 +43,9 @@ fn serialize_add_command() {
 
 #[test]
 fn serialize_remove_command() {
-    let cmd = Command::Remove { name: "discord".into() };
+    let cmd = Command::Remove {
+        name: "discord".into(),
+    };
     let json = serde_json::to_string(&cmd).unwrap();
     let deserialized: Command = serde_json::from_str(&json).unwrap();
     match deserialized {
@@ -195,7 +201,11 @@ fn serialize_add_command_empty_ports() {
     let json = serde_json::to_string(&cmd).unwrap();
     let deserialized: Command = serde_json::from_str(&json).unwrap();
     match deserialized {
-        Command::Add { name, binary, ports } => {
+        Command::Add {
+            name,
+            binary,
+            ports,
+        } => {
             assert_eq!(name, "bare_app");
             assert_eq!(binary, "bare");
             assert!(ports.is_empty());
@@ -241,7 +251,9 @@ fn serialize_add_command_unicode_name() {
 
 #[test]
 fn serialize_remove_command_with_dashes() {
-    let cmd = Command::Remove { name: "my-complex-app-name".into() };
+    let cmd = Command::Remove {
+        name: "my-complex-app-name".into(),
+    };
     let json = serde_json::to_string(&cmd).unwrap();
     let deserialized: Command = serde_json::from_str(&json).unwrap();
     match deserialized {
@@ -252,7 +264,9 @@ fn serialize_remove_command_with_dashes() {
 
 #[test]
 fn serialize_enable_command_with_dots() {
-    let cmd = Command::Enable { name: "app.v2.3".into() };
+    let cmd = Command::Enable {
+        name: "app.v2.3".into(),
+    };
     let json = serde_json::to_string(&cmd).unwrap();
     let deserialized: Command = serde_json::from_str(&json).unwrap();
     match deserialized {
@@ -263,7 +277,9 @@ fn serialize_enable_command_with_dots() {
 
 #[test]
 fn serialize_disable_command_with_underscores() {
-    let cmd = Command::Disable { name: "my_app_name".into() };
+    let cmd = Command::Disable {
+        name: "my_app_name".into(),
+    };
     let json = serde_json::to_string(&cmd).unwrap();
     let deserialized: Command = serde_json::from_str(&json).unwrap();
     match deserialized {
@@ -285,7 +301,9 @@ fn serialize_add_command_many_ports() {
     let json = serde_json::to_string(&cmd).unwrap();
     let deserialized: Command = serde_json::from_str(&json).unwrap();
     match deserialized {
-        Command::Add { ports: deser_ports, .. } => {
+        Command::Add {
+            ports: deser_ports, ..
+        } => {
             assert_eq!(deser_ports.len(), 20);
             assert_eq!(deser_ports[0], "1001/tcp");
             assert_eq!(deser_ports[19], "1020/tcp");
@@ -351,7 +369,11 @@ fn command_clone_add() {
     };
     let cloned = cmd.clone();
     match cloned {
-        Command::Add { name, binary, ports } => {
+        Command::Add {
+            name,
+            binary,
+            ports,
+        } => {
             assert_eq!(name, "test");
             assert_eq!(binary, "bin");
             assert_eq!(ports, vec!["80/tcp"]);
@@ -378,7 +400,11 @@ fn all_commands_json_are_distinct() {
     ];
     for i in 0..commands.len() {
         for j in (i + 1)..commands.len() {
-            assert_ne!(commands[i], commands[j], "Commands at {} and {} should differ", i, j);
+            assert_ne!(
+                commands[i], commands[j],
+                "Commands at {} and {} should differ",
+                i, j
+            );
         }
     }
 }

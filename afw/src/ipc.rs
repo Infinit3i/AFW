@@ -55,8 +55,8 @@ async fn handle_client(stream: UnixStream, state: Arc<Mutex<AppState>>) -> Resul
     let mut line = String::new();
     reader.read_line(&mut line).await?;
 
-    let cmd: Command = serde_json::from_str(line.trim())
-        .context("Failed to parse command from client")?;
+    let cmd: Command =
+        serde_json::from_str(line.trim()).context("Failed to parse command from client")?;
 
     debug!("Received IPC command: {:?}", cmd);
 
@@ -91,7 +91,10 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
             } else {
                 for app in &config.app {
                     let status = if app.enabled { "enabled" } else { "disabled" };
-                    msg.push_str(&format!("  {} [{}] (binary: {})\n", app.name, status, app.binary));
+                    msg.push_str(&format!(
+                        "  {} [{}] (binary: {})\n",
+                        app.name, status, app.binary
+                    ));
                     for port in &app.outbound {
                         let port_str = match port.range_end {
                             Some(end) => format!("{}-{}/{}", port.port, end, port.protocol),
@@ -107,8 +110,13 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
                 message: msg,
             }
         }
-        Command::Add { name, binary, ports } => {
-            let port_rules: Result<Vec<_>, _> = ports.iter().map(|p| config::parse_port_rule(p)).collect();
+        Command::Add {
+            name,
+            binary,
+            ports,
+        } => {
+            let port_rules: Result<Vec<_>, _> =
+                ports.iter().map(|p| config::parse_port_rule(p)).collect();
             match port_rules {
                 Ok(port_rules) => {
                     let mut state = state.lock().await;
@@ -177,33 +185,27 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
                 message: format!("Removed app '{}'", name),
             }
         }
-        Command::Enable { name } => {
-            toggle_app(state, &name, true).await
-        }
-        Command::Disable { name } => {
-            toggle_app(state, &name, false).await
-        }
-        Command::Reload => {
-            match Config::load(None) {
-                Ok(config) => {
-                    let mut state = state.lock().await;
-                    match state.reload_config(config) {
-                        Ok(()) => DaemonResponse {
-                            success: true,
-                            message: "Config reloaded".into(),
-                        },
-                        Err(e) => DaemonResponse {
-                            success: false,
-                            message: format!("Reload failed: {}", e),
-                        },
-                    }
+        Command::Enable { name } => toggle_app(state, &name, true).await,
+        Command::Disable { name } => toggle_app(state, &name, false).await,
+        Command::Reload => match Config::load(None) {
+            Ok(config) => {
+                let mut state = state.lock().await;
+                match state.reload_config(config) {
+                    Ok(()) => DaemonResponse {
+                        success: true,
+                        message: "Config reloaded".into(),
+                    },
+                    Err(e) => DaemonResponse {
+                        success: false,
+                        message: format!("Reload failed: {}", e),
+                    },
                 }
-                Err(e) => DaemonResponse {
-                    success: false,
-                    message: format!("Failed to read config: {}", e),
-                },
             }
-        }
+            Err(e) => DaemonResponse {
+                success: false,
+                message: format!("Failed to read config: {}", e),
+            },
+        },
         Command::Rules => {
             let state = state.lock().await;
             match state.nft().list_rules() {
@@ -217,12 +219,10 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
                 },
             }
         }
-        Command::Daemon => {
-            DaemonResponse {
-                success: false,
-                message: "Cannot run daemon via IPC".into(),
-            }
-        }
+        Command::Daemon => DaemonResponse {
+            success: false,
+            message: "Cannot run daemon via IPC".into(),
+        },
     }
 }
 
@@ -260,14 +260,12 @@ async fn toggle_app(state: Arc<Mutex<AppState>>, name: &str, enable: bool) -> Da
 
 /// Send a command to the daemon via IPC (called by CLI)
 pub async fn client_request(cmd: Command) -> Result<()> {
-    let stream = UnixStream::connect(SOCKET_PATH)
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to connect to AFW daemon at {}. Is the daemon running?",
-                SOCKET_PATH
-            )
-        })?;
+    let stream = UnixStream::connect(SOCKET_PATH).await.with_context(|| {
+        format!(
+            "Failed to connect to AFW daemon at {}. Is the daemon running?",
+            SOCKET_PATH
+        )
+    })?;
 
     let (reader, mut writer) = stream.into_split();
 
@@ -280,8 +278,8 @@ pub async fn client_request(cmd: Command) -> Result<()> {
     let mut response_line = String::new();
     reader.read_line(&mut response_line).await?;
 
-    let response: DaemonResponse = serde_json::from_str(response_line.trim())
-        .context("Failed to parse daemon response")?;
+    let response: DaemonResponse =
+        serde_json::from_str(response_line.trim()).context("Failed to parse daemon response")?;
 
     if response.success {
         print!("{}", response.message);

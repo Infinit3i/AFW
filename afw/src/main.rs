@@ -1,5 +1,5 @@
-use clap::Parser;
 use afw::cli::{Cli, Command};
+use clap::Parser;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -7,10 +7,8 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Command::Daemon => {
-            env_logger::Builder::from_env(
-                env_logger::Env::default().default_filter_or("info"),
-            )
-            .init();
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                .init();
             afw::daemon::run().await
         }
         cmd => afw::ipc::client_request(cmd).await,

@@ -45,7 +45,10 @@ impl AppState {
             None => return Ok(()),
         };
 
-        debug!("Monitored app exec: {} (pid {}, binary '{}')", app_name, pid, comm);
+        debug!(
+            "Monitored app exec: {} (pid {}, binary '{}')",
+            app_name, pid, comm
+        );
 
         let pids = self.active_pids.entry(app_name.clone()).or_default();
         let was_empty = pids.is_empty();
@@ -74,7 +77,10 @@ impl AppState {
             None => return Ok(()),
         };
 
-        debug!("Monitored app exit: {} (pid {}, binary '{}')", app_name, pid, comm);
+        debug!(
+            "Monitored app exit: {} (pid {}, binary '{}')",
+            app_name, pid, comm
+        );
 
         let should_remove = if let Some(pids) = self.active_pids.get_mut(&app_name) {
             pids.remove(&pid);
@@ -84,7 +90,10 @@ impl AppState {
         };
 
         if should_remove {
-            info!("Closing ports for app '{}' (last instance pid {} exited)", app_name, pid);
+            info!(
+                "Closing ports for app '{}' (last instance pid {} exited)",
+                app_name, pid
+            );
             self.nft.remove_app_rules(&app_name)?;
             self.active_pids.remove(&app_name);
         }
@@ -128,7 +137,10 @@ impl AppState {
 
         for app_name in old_apps.difference(&new_apps) {
             if self.active_pids.contains_key(app_name) {
-                info!("App '{}' removed/disabled in config, closing ports", app_name);
+                info!(
+                    "App '{}' removed/disabled in config, closing ports",
+                    app_name
+                );
                 self.nft.remove_app_rules(app_name)?;
                 self.active_pids.remove(app_name);
             }
@@ -149,10 +161,7 @@ impl AppState {
         out.push_str("AFW Status\n");
         out.push_str("══════════\n\n");
 
-        out.push_str(&format!(
-            "Monitored apps: {}\n",
-            self.config.app.len()
-        ));
+        out.push_str(&format!("Monitored apps: {}\n", self.config.app.len()));
 
         let active_count = self.active_pids.values().filter(|p| !p.is_empty()).count();
         out.push_str(&format!("Active apps:    {}\n\n", active_count));

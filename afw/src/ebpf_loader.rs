@@ -20,18 +20,15 @@ fn ebpf_obj_path() -> &'static str {
 }
 
 /// Load and attach eBPF programs, return a channel of ProcessEvents
-pub async fn load_and_attach(
-    tx: mpsc::UnboundedSender<ProcessEvent>,
-) -> Result<Ebpf> {
+pub async fn load_and_attach(tx: mpsc::UnboundedSender<ProcessEvent>) -> Result<Ebpf> {
     // Try release first, fall back to debug
     let ebpf_path = ebpf_obj_path();
-    let ebpf_bytes = std::fs::read(ebpf_path)
-        .with_context(|| {
-            format!(
-                "Failed to read eBPF object at {}. Did you run 'cargo xtask build-ebpf --release'?",
-                ebpf_path
-            )
-        })?;
+    let ebpf_bytes = std::fs::read(ebpf_path).with_context(|| {
+        format!(
+            "Failed to read eBPF object at {}. Did you run 'cargo xtask build-ebpf --release'?",
+            ebpf_path
+        )
+    })?;
 
     let mut bpf = EbpfLoader::new()
         .load(&ebpf_bytes)
@@ -59,9 +56,8 @@ pub async fn load_and_attach(
     info!("Attached eBPF tracepoint: sched/sched_process_exit");
 
     // Set up perf event reading
-    let mut perf_array = AsyncPerfEventArray::try_from(
-        bpf.take_map("EVENTS").context("EVENTS map not found")?,
-    )?;
+    let mut perf_array =
+        AsyncPerfEventArray::try_from(bpf.take_map("EVENTS").context("EVENTS map not found")?)?;
 
     let cpus = online_cpus().map_err(|(msg, e)| anyhow::anyhow!("{}: {}", msg, e))?;
     for cpu_id in cpus {
@@ -82,11 +78,11 @@ pub async fn load_and_attach(
                     }
                 };
 
-                for i in 0..events.read {
-                    let buf = &buffers[i];
+                for buf in buffers.iter().take(events.read) {
                     if buf.len() >= std::mem::size_of::<ProcessEvent>() {
-                        let event: ProcessEvent =
-                            unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const ProcessEvent) };
+                        let event: ProcessEvent = unsafe {
+                            std::ptr::read_unaligned(buf.as_ptr() as *const ProcessEvent)
+                        };
                         if tx.send(event).is_err() {
                             return; // Channel closed, daemon shutting down
                         }

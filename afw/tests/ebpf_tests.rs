@@ -42,7 +42,10 @@ fn comm_single_char() {
 
 #[test]
 fn comm_15_chars() {
-    assert_eq!(comm_to_string(&make_comm("123456789012345")), "123456789012345");
+    assert_eq!(
+        comm_to_string(&make_comm("123456789012345")),
+        "123456789012345"
+    );
 }
 
 #[test]
@@ -169,7 +172,7 @@ fn comm_with_only_null_bytes() {
 fn comm_first_byte_null() {
     let mut comm = [0u8; 16];
     comm[1] = b'a'; // data after null
-    // Should return empty since first byte is null
+                    // Should return empty since first byte is null
     assert_eq!(comm_to_string(&comm), "");
 }
 
@@ -310,9 +313,22 @@ fn process_event_default_comm_is_zeroed() {
 #[test]
 fn comm_real_world_process_names() {
     let names = [
-        "systemd", "sshd", "bash", "zsh", "init", "cron", "Xwayland",
-        "pipewire", "dbus-broker", "Discord", "firefox", "steam",
-        "code-oss", "signal-deskto", "systemd-resolve", "wg-quick",
+        "systemd",
+        "sshd",
+        "bash",
+        "zsh",
+        "init",
+        "cron",
+        "Xwayland",
+        "pipewire",
+        "dbus-broker",
+        "Discord",
+        "firefox",
+        "steam",
+        "code-oss",
+        "signal-deskto",
+        "systemd-resolve",
+        "wg-quick",
     ];
     for name in names {
         let result = comm_to_string(&make_comm(name));
@@ -371,9 +387,8 @@ fn process_event_ptr_read_unaligned_simulation() {
             std::mem::size_of::<ProcessEvent>(),
         )
     };
-    let recovered: ProcessEvent = unsafe {
-        std::ptr::read_unaligned(bytes.as_ptr() as *const ProcessEvent)
-    };
+    let recovered: ProcessEvent =
+        unsafe { std::ptr::read_unaligned(bytes.as_ptr() as *const ProcessEvent) };
     assert_eq!(recovered.pid, 12345);
     assert_eq!(recovered.event_type, EVENT_EXIT);
     assert_eq!(comm_to_string(&recovered.comm), "firefox");

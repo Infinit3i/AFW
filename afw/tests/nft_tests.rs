@@ -1,74 +1,128 @@
 use afw::config::PortRule;
-use afw::nft::{build_add_app_rules_script, build_init_table_script, format_port_rule, parse_rule_handles};
+use afw::nft::{
+    build_add_app_rules_script, build_init_table_script, format_port_rule, parse_rule_handles,
+};
 
 // === format_port_rule ===
 
 #[test]
 fn format_single_tcp_port() {
-    let rule = PortRule { port: 443, range_end: None, protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 443,
+        range_end: None,
+        protocol: "tcp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "tcp dport 443 accept");
 }
 
 #[test]
 fn format_single_udp_port() {
-    let rule = PortRule { port: 53, range_end: None, protocol: "udp".into() };
+    let rule = PortRule {
+        port: 53,
+        range_end: None,
+        protocol: "udp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "udp dport 53 accept");
 }
 
 #[test]
 fn format_tcp_port_range() {
-    let rule = PortRule { port: 27015, range_end: Some(27050), protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 27015,
+        range_end: Some(27050),
+        protocol: "tcp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "tcp dport 27015-27050 accept");
 }
 
 #[test]
 fn format_udp_port_range() {
-    let rule = PortRule { port: 50000, range_end: Some(50100), protocol: "udp".into() };
+    let rule = PortRule {
+        port: 50000,
+        range_end: Some(50100),
+        protocol: "udp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "udp dport 50000-50100 accept");
 }
 
 #[test]
 fn format_port_80() {
-    let rule = PortRule { port: 80, range_end: None, protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 80,
+        range_end: None,
+        protocol: "tcp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "tcp dport 80 accept");
 }
 
 #[test]
 fn format_high_port() {
-    let rule = PortRule { port: 65535, range_end: None, protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 65535,
+        range_end: None,
+        protocol: "tcp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "tcp dport 65535 accept");
 }
 
 #[test]
 fn format_port_1() {
-    let rule = PortRule { port: 1, range_end: None, protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 1,
+        range_end: None,
+        protocol: "tcp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "tcp dport 1 accept");
 }
 
 #[test]
 fn format_wide_range() {
-    let rule = PortRule { port: 1024, range_end: Some(65535), protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 1024,
+        range_end: Some(65535),
+        protocol: "tcp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "tcp dport 1024-65535 accept");
 }
 
 #[test]
 fn format_rule_contains_accept() {
-    let rule = PortRule { port: 443, range_end: None, protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 443,
+        range_end: None,
+        protocol: "tcp".into(),
+    };
     assert!(format_port_rule(&rule).ends_with("accept"));
 }
 
 #[test]
 fn format_rule_contains_dport() {
-    let rule = PortRule { port: 443, range_end: None, protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 443,
+        range_end: None,
+        protocol: "tcp".into(),
+    };
     assert!(format_port_rule(&rule).contains("dport"));
 }
 
 #[test]
 fn format_discord_rules() {
     let ports = vec![
-        PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-        PortRule { port: 80, range_end: None, protocol: "tcp".into() },
-        PortRule { port: 50000, range_end: Some(50100), protocol: "udp".into() },
+        PortRule {
+            port: 443,
+            range_end: None,
+            protocol: "tcp".into(),
+        },
+        PortRule {
+            port: 80,
+            range_end: None,
+            protocol: "tcp".into(),
+        },
+        PortRule {
+            port: 50000,
+            range_end: Some(50100),
+            protocol: "udp".into(),
+        },
     ];
     let rules: Vec<String> = ports.iter().map(|p| format_port_rule(p)).collect();
     assert_eq!(rules[0], "tcp dport 443 accept");
@@ -79,11 +133,31 @@ fn format_discord_rules() {
 #[test]
 fn format_base_default_ports() {
     let base_ports = vec![
-        PortRule { port: 53, range_end: None, protocol: "udp".into() },
-        PortRule { port: 123, range_end: None, protocol: "udp".into() },
-        PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-        PortRule { port: 80, range_end: None, protocol: "tcp".into() },
-        PortRule { port: 68, range_end: None, protocol: "udp".into() },
+        PortRule {
+            port: 53,
+            range_end: None,
+            protocol: "udp".into(),
+        },
+        PortRule {
+            port: 123,
+            range_end: None,
+            protocol: "udp".into(),
+        },
+        PortRule {
+            port: 443,
+            range_end: None,
+            protocol: "tcp".into(),
+        },
+        PortRule {
+            port: 80,
+            range_end: None,
+            protocol: "tcp".into(),
+        },
+        PortRule {
+            port: 68,
+            range_end: None,
+            protocol: "udp".into(),
+        },
     ];
     let rules: Vec<String> = base_ports.iter().map(|p| format_port_rule(p)).collect();
     assert_eq!(rules.len(), 5);
@@ -149,8 +223,16 @@ fn init_script_no_icmp_no_loopback() {
 #[test]
 fn init_script_includes_base_ports() {
     let ports = vec![
-        PortRule { port: 53, range_end: None, protocol: "udp".into() },
-        PortRule { port: 443, range_end: None, protocol: "tcp".into() },
+        PortRule {
+            port: 53,
+            range_end: None,
+            protocol: "udp".into(),
+        },
+        PortRule {
+            port: 443,
+            range_end: None,
+            protocol: "tcp".into(),
+        },
     ];
     let script = build_init_table_script(&ports, false, false);
     assert!(script.contains("udp dport 53 accept"));
@@ -166,7 +248,11 @@ fn init_script_has_input_and_output_chains() {
 
 #[test]
 fn init_script_all_features() {
-    let ports = vec![PortRule { port: 80, range_end: None, protocol: "tcp".into() }];
+    let ports = vec![PortRule {
+        port: 80,
+        range_end: None,
+        protocol: "tcp".into(),
+    }];
     let script = build_init_table_script(&ports, true, true);
     assert!(script.contains("oif lo accept"));
     assert!(script.contains("iif lo accept"));
@@ -179,7 +265,11 @@ fn init_script_all_features() {
 
 #[test]
 fn add_script_single_port() {
-    let ports = vec![PortRule { port: 443, range_end: None, protocol: "tcp".into() }];
+    let ports = vec![PortRule {
+        port: 443,
+        range_end: None,
+        protocol: "tcp".into(),
+    }];
     let script = build_add_app_rules_script("discord", &ports);
     assert_eq!(
         script,
@@ -190,8 +280,16 @@ fn add_script_single_port() {
 #[test]
 fn add_script_multiple_ports() {
     let ports = vec![
-        PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-        PortRule { port: 80, range_end: None, protocol: "tcp".into() },
+        PortRule {
+            port: 443,
+            range_end: None,
+            protocol: "tcp".into(),
+        },
+        PortRule {
+            port: 80,
+            range_end: None,
+            protocol: "tcp".into(),
+        },
     ];
     let script = build_add_app_rules_script("firefox", &ports);
     let lines: Vec<&str> = script.lines().collect();
@@ -208,14 +306,22 @@ fn add_script_empty_ports() {
 
 #[test]
 fn add_script_comment_contains_app_name() {
-    let ports = vec![PortRule { port: 443, range_end: None, protocol: "tcp".into() }];
+    let ports = vec![PortRule {
+        port: 443,
+        range_end: None,
+        protocol: "tcp".into(),
+    }];
     let script = build_add_app_rules_script("my-app", &ports);
     assert!(script.contains("comment \"afw:my-app\""));
 }
 
 #[test]
 fn add_script_with_range() {
-    let ports = vec![PortRule { port: 50000, range_end: Some(50100), protocol: "udp".into() }];
+    let ports = vec![PortRule {
+        port: 50000,
+        range_end: Some(50100),
+        protocol: "udp".into(),
+    }];
     let script = build_add_app_rules_script("discord", &ports);
     assert!(script.contains("udp dport 50000-50100 accept"));
 }
@@ -290,7 +396,11 @@ fn init_script_many_base_ports() {
         .map(|i| PortRule {
             port: 1000 + i,
             range_end: None,
-            protocol: if i % 2 == 0 { "tcp".into() } else { "udp".into() },
+            protocol: if i % 2 == 0 {
+                "tcp".into()
+            } else {
+                "udp".into()
+            },
         })
         .collect();
     let script = build_init_table_script(&ports, true, true);
@@ -311,8 +421,16 @@ fn init_script_many_base_ports() {
 #[test]
 fn init_script_base_ports_with_ranges() {
     let ports = vec![
-        PortRule { port: 1024, range_end: Some(2048), protocol: "tcp".into() },
-        PortRule { port: 5000, range_end: Some(6000), protocol: "udp".into() },
+        PortRule {
+            port: 1024,
+            range_end: Some(2048),
+            protocol: "tcp".into(),
+        },
+        PortRule {
+            port: 5000,
+            range_end: Some(6000),
+            protocol: "udp".into(),
+        },
     ];
     let script = build_init_table_script(&ports, false, false);
     assert!(script.contains("tcp dport 1024-2048 accept"));
@@ -323,21 +441,33 @@ fn init_script_base_ports_with_ranges() {
 
 #[test]
 fn add_script_app_name_with_dashes() {
-    let ports = vec![PortRule { port: 443, range_end: None, protocol: "tcp".into() }];
+    let ports = vec![PortRule {
+        port: 443,
+        range_end: None,
+        protocol: "tcp".into(),
+    }];
     let script = build_add_app_rules_script("my-cool-app", &ports);
     assert!(script.contains("comment \"afw:my-cool-app\""));
 }
 
 #[test]
 fn add_script_app_name_with_underscores() {
-    let ports = vec![PortRule { port: 80, range_end: None, protocol: "tcp".into() }];
+    let ports = vec![PortRule {
+        port: 80,
+        range_end: None,
+        protocol: "tcp".into(),
+    }];
     let script = build_add_app_rules_script("my_app_v2", &ports);
     assert!(script.contains("comment \"afw:my_app_v2\""));
 }
 
 #[test]
 fn add_script_app_name_with_dots() {
-    let ports = vec![PortRule { port: 8080, range_end: None, protocol: "tcp".into() }];
+    let ports = vec![PortRule {
+        port: 8080,
+        range_end: None,
+        protocol: "tcp".into(),
+    }];
     let script = build_add_app_rules_script("app.v3.1", &ports);
     assert!(script.contains("comment \"afw:app.v3.1\""));
 }
@@ -367,9 +497,21 @@ fn add_script_many_ports() {
 #[test]
 fn add_script_mixed_protocols() {
     let ports = vec![
-        PortRule { port: 443, range_end: None, protocol: "tcp".into() },
-        PortRule { port: 53, range_end: None, protocol: "udp".into() },
-        PortRule { port: 8000, range_end: Some(9000), protocol: "tcp".into() },
+        PortRule {
+            port: 443,
+            range_end: None,
+            protocol: "tcp".into(),
+        },
+        PortRule {
+            port: 53,
+            range_end: None,
+            protocol: "udp".into(),
+        },
+        PortRule {
+            port: 8000,
+            range_end: Some(9000),
+            protocol: "tcp".into(),
+        },
     ];
     let script = build_add_app_rules_script("mixed", &ports);
     let lines: Vec<&str> = script.lines().collect();
@@ -447,13 +589,21 @@ fn parse_handles_comment_substring_no_false_match() {
 
 #[test]
 fn format_port_range_one_apart() {
-    let rule = PortRule { port: 100, range_end: Some(101), protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 100,
+        range_end: Some(101),
+        protocol: "tcp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "tcp dport 100-101 accept");
 }
 
 #[test]
 fn format_port_zero() {
-    let rule = PortRule { port: 0, range_end: None, protocol: "tcp".into() };
+    let rule = PortRule {
+        port: 0,
+        range_end: None,
+        protocol: "tcp".into(),
+    };
     assert_eq!(format_port_rule(&rule), "tcp dport 0 accept");
 }
 
@@ -468,7 +618,11 @@ fn init_script_ends_with_closing_brace() {
 #[test]
 fn init_script_base_ports_in_output_chain() {
     // Base ports should appear between "chain output" and "chain input"
-    let ports = vec![PortRule { port: 12345, range_end: None, protocol: "tcp".into() }];
+    let ports = vec![PortRule {
+        port: 12345,
+        range_end: None,
+        protocol: "tcp".into(),
+    }];
     let script = build_init_table_script(&ports, false, false);
     let output_pos = script.find("chain output").unwrap();
     let input_pos = script.find("chain input").unwrap();
@@ -481,7 +635,10 @@ fn init_script_icmp_in_both_chains() {
     let script = build_init_table_script(&[], true, false);
     // ICMP rules should appear twice (once in output, once in input)
     let count = script.matches("meta l4proto icmp accept").count();
-    assert_eq!(count, 2, "ICMP should appear in both input and output chains");
+    assert_eq!(
+        count, 2,
+        "ICMP should appear in both input and output chains"
+    );
 }
 
 #[test]

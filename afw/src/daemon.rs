@@ -23,8 +23,12 @@ pub async fn run() -> Result<()> {
     );
 
     let nft = RealNftBackend;
-    nft.init_table(&config.base.outbound, config.base.icmp, config.base.loopback)
-        .context("Failed to initialize nftables")?;
+    nft.init_table(
+        &config.base.outbound,
+        config.base.icmp,
+        config.base.loopback,
+    )
+    .context("Failed to initialize nftables")?;
 
     let mut state = AppState::new(config.clone());
     state.scan_existing_processes()?;
@@ -82,7 +86,10 @@ pub async fn run() -> Result<()> {
 
     info!("Cleaning up nftables rules...");
     if let Err(e) = nft.cleanup() {
-        warn!("Failed to cleanup nftables: {}. The ExecStopPost should handle it.", e);
+        warn!(
+            "Failed to cleanup nftables: {}. The ExecStopPost should handle it.",
+            e
+        );
     }
 
     info!("AFW daemon stopped");

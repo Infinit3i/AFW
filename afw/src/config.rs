@@ -61,11 +61,31 @@ fn default_true() -> bool {
 
 fn default_base_ports() -> Vec<PortRule> {
     vec![
-        PortRule { port: 53, range_end: None, protocol: "udp".into() },   // DNS
-        PortRule { port: 123, range_end: None, protocol: "udp".into() },  // NTP
-        PortRule { port: 443, range_end: None, protocol: "tcp".into() },  // HTTPS
-        PortRule { port: 80, range_end: None, protocol: "tcp".into() },   // HTTP
-        PortRule { port: 68, range_end: None, protocol: "udp".into() },   // DHCP
+        PortRule {
+            port: 53,
+            range_end: None,
+            protocol: "udp".into(),
+        }, // DNS
+        PortRule {
+            port: 123,
+            range_end: None,
+            protocol: "udp".into(),
+        }, // NTP
+        PortRule {
+            port: 443,
+            range_end: None,
+            protocol: "tcp".into(),
+        }, // HTTPS
+        PortRule {
+            port: 80,
+            range_end: None,
+            protocol: "tcp".into(),
+        }, // HTTP
+        PortRule {
+            port: 68,
+            range_end: None,
+            protocol: "udp".into(),
+        }, // DHCP
     ]
 }
 
@@ -102,7 +122,11 @@ impl Config {
                     .with_context(|| format!("Failed to read drop-in config: {}", file_str))?;
                 let drop_in: DropInConfig = toml::from_str(&contents)
                     .with_context(|| format!("Failed to parse drop-in config: {}", file_str))?;
-                info!("Loaded drop-in config: {} ({} apps)", file_str, drop_in.app.len());
+                info!(
+                    "Loaded drop-in config: {} ({} apps)",
+                    file_str,
+                    drop_in.app.len()
+                );
                 config.app.extend(drop_in.app);
             }
         }
@@ -113,8 +137,7 @@ impl Config {
     /// Save the base config to the main file (does not touch conf.d/)
     pub fn save(&self, path: Option<&str>) -> Result<()> {
         let config_path = path.unwrap_or(DEFAULT_CONFIG_PATH);
-        let contents = toml::to_string_pretty(self)
-            .context("Failed to serialize config")?;
+        let contents = toml::to_string_pretty(self).context("Failed to serialize config")?;
         if let Some(parent) = Path::new(config_path).parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -125,14 +148,18 @@ impl Config {
 
     /// Save a full config split across the main file (base only) and conf.d/ drop-ins.
     /// Apps are written to the specified drop-in file name.
-    pub fn save_apps_to_drop_in(apps: &[AppConfig], drop_in_name: &str, path: Option<&str>) -> Result<()> {
+    pub fn save_apps_to_drop_in(
+        apps: &[AppConfig],
+        drop_in_name: &str,
+        path: Option<&str>,
+    ) -> Result<()> {
         let config_path = path.unwrap_or(DEFAULT_CONFIG_PATH);
         let conf_dir = conf_dir_for(config_path);
         std::fs::create_dir_all(&conf_dir)?;
 
         let drop_in = DropInConfig { app: apps.to_vec() };
-        let contents = toml::to_string_pretty(&drop_in)
-            .context("Failed to serialize drop-in config")?;
+        let contents =
+            toml::to_string_pretty(&drop_in).context("Failed to serialize drop-in config")?;
 
         let drop_in_path = conf_dir.join(format!("{}.toml", drop_in_name));
         std::fs::write(&drop_in_path, &contents)
@@ -170,7 +197,10 @@ impl Config {
 pub fn parse_port_rule(s: &str) -> Result<PortRule> {
     let parts: Vec<&str> = s.split('/').collect();
     if parts.len() != 2 {
-        anyhow::bail!("Invalid port format '{}', expected PORT/PROTO or PORT-PORT/PROTO", s);
+        anyhow::bail!(
+            "Invalid port format '{}', expected PORT/PROTO or PORT-PORT/PROTO",
+            s
+        );
     }
 
     let protocol = parts[1].to_lowercase();
@@ -180,17 +210,28 @@ pub fn parse_port_rule(s: &str) -> Result<PortRule> {
 
     let port_part = parts[0];
     if let Some(dash_pos) = port_part.find('-') {
-        let start: u16 = port_part[..dash_pos].parse()
+        let start: u16 = port_part[..dash_pos]
+            .parse()
             .with_context(|| format!("Invalid port number in '{}'", s))?;
-        let end: u16 = port_part[dash_pos + 1..].parse()
+        let end: u16 = port_part[dash_pos + 1..]
+            .parse()
             .with_context(|| format!("Invalid port number in '{}'", s))?;
         if end <= start {
             anyhow::bail!("Port range end must be greater than start in '{}'", s);
         }
-        Ok(PortRule { port: start, range_end: Some(end), protocol })
+        Ok(PortRule {
+            port: start,
+            range_end: Some(end),
+            protocol,
+        })
     } else {
-        let port: u16 = port_part.parse()
+        let port: u16 = port_part
+            .parse()
             .with_context(|| format!("Invalid port number in '{}'", s))?;
-        Ok(PortRule { port, range_end: None, protocol })
+        Ok(PortRule {
+            port,
+            range_end: None,
+            protocol,
+        })
     }
 }
