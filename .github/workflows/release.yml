@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-release:
+    name: Build Release Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust nightly (for eBPF)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Set stable as default
+        run: rustup default stable
+
+      - name: Install bpf-linker
+        run: cargo +nightly install bpf-linker
+
+      - name: Build
+        run: |
+          cargo xtask build-ebpf --release
+          cargo build --package afw --release
+
+      - name: Test
+        run: cargo test --package afw
+
+      - name: Prepare release artifacts
+        run: |
+          mkdir -p release
+
+          # Standalone binary tarball
+          tar czf release/afw-${{ github.ref_name }}-x86_64-linux.tar.gz \
+            -C target/release afw \
+            -C ${{ github.workspace }} \
+            config/ systemd/ install.sh uninstall.sh README.md
+
+          # .deb package
+          mkdir -p dpkg/usr/bin
+          mkdir -p dpkg/etc/afw/conf.d
+          mkdir -p dpkg/lib/systemd/system
+          mkdir -p dpkg/DEBIAN
+          cp target/release/afw dpkg/usr/bin/
+          cp config/afw.toml dpkg/etc/afw/
+          cp config/conf.d/*.toml dpkg/etc/afw/conf.d/
+          cp systemd/afw.service dpkg/lib/systemd/system/
+
+          cat > dpkg/DEBIAN/control <<CTRL
+          Package: afw
+          Version: ${{ github.ref_name }}
+          Section: net
+          Priority: optional
+          Architecture: amd64
+          Depends: nftables
+          Maintainer: infinit3i
+          Description: Application Firewall - eBPF process monitoring with dynamic nftables rules
+           AFW is an eBPF-powered per-application outbound firewall for Linux.
+          CTRL
+          # Remove leading spaces from heredoc
+          sed -i 's/^          //' dpkg/DEBIAN/control
+
+          cat > dpkg/DEBIAN/conffiles <<CONF
+          /etc/afw/afw.toml
+          CONF
+
+          cat > dpkg/DEBIAN/postinst <<POST
+          #!/bin/sh
+          systemctl daemon-reload || true
+          POST
+          chmod 755 dpkg/DEBIAN/postinst
+
+          cat > dpkg/DEBIAN/postrm <<REM
+          #!/bin/sh
+          if [ "\$1" = "remove" ] || [ "\$1" = "purge" ]; then
+              nft delete table inet afw 2>/dev/null || true
+              systemctl daemon-reload || true
+          fi
+          REM
+          chmod 755 dpkg/DEBIAN/postrm
+
+          dpkg-deb --build dpkg release/afw-${{ github.ref_name }}-amd64.deb
+
+          # RPM (using fpm if available, otherwise just provide the spec + tarball)
+          # The tarball + spec is enough for users to build with rpmbuild
+          cp pkg/rpm/afw.spec release/
+
+          # Checksums
+          cd release
+          sha256sum * > SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release/afw-${{ github.ref_name }}-x86_64-linux.tar.gz
+            release/afw-${{ github.ref_name }}-amd64.deb
+            release/afw.spec
+            release/SHA256SUMS
