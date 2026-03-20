@@ -6,31 +6,22 @@
 [base]
 # Always-allowed outbound ports
 outbound = [
-    { port = 53,  protocol = "udp" },   # DNS (UDP)
-    { port = 53,  protocol = "tcp" },   # DNS (TCP)
-    { port = 123, protocol = "udp" },   # NTP
-    { port = 443, protocol = "tcp" },   # HTTPS
-    { port = 80,  protocol = "tcp" },   # HTTP
-    { port = 68,  protocol = "udp" },   # DHCP
-    { port = 2053, protocol = "tcp" },  # Cloudflare DNS/HTTPS
-    { port = 2083, protocol = "tcp" },  # Cloudflare HTTPS
-    { port = 8443, protocol = "tcp" },  # HTTPS alternate (Cloudflare)
+    { port = 53,   protocol = "udp" },   # DNS (UDP)
+    { port = 53,   protocol = "tcp" },   # DNS (TCP)
+    { port = 123,  protocol = "udp" },   # NTP
+    { port = 443,  protocol = "tcp" },   # HTTPS
+    { port = 80,   protocol = "tcp" },   # HTTP
+    { port = 68,   protocol = "udp" },   # DHCP client
+    { port = 67,   protocol = "udp" },   # DHCP server
+    { port = 853,  protocol = "tcp" },   # DNS over TLS
+    { port = 2053, protocol = "tcp" },   # Cloudflare DNS/HTTPS
+    { port = 2083, protocol = "tcp" },   # Cloudflare HTTPS
+    { port = 8443, protocol = "tcp" },   # HTTPS alternate (Cloudflare)
 ]
 icmp = true
 loopback = true
 
-# Discord
-[[app]]
-name = "discord"
-binary = "Discord"
-enabled = true
-outbound = [
-    { port = 443, protocol = "tcp" },
-    { port = 80,  protocol = "tcp" },
-    { port = 2053, protocol = "tcp" },
-    { port = 8443, protocol = "tcp" },
-    { port = 50000, range_end = 65535, protocol = "udp" },  # Voice/video
-]
+# ─── Browsers ────────────────────────────────────────────────
 
 # Firefox
 [[app]]
@@ -38,12 +29,218 @@ name = "firefox"
 binary = "firefox"
 enabled = true
 outbound = [
-    { port = 443, protocol = "tcp" },
-    { port = 80,  protocol = "tcp" },
+    { port = 443,  protocol = "tcp" },   # HTTPS
+    { port = 80,   protocol = "tcp" },   # HTTP
+    { port = 8080, protocol = "tcp" },   # HTTP alternate
+    { port = 8443, protocol = "tcp" },   # HTTPS alternate
+    { port = 2053, protocol = "tcp" },   # Cloudflare
+    { port = 2083, protocol = "tcp" },   # Cloudflare
+    { port = 5228, protocol = "tcp" },   # Google services
+]
+
+# LibreWolf
+[[app]]
+name = "librewolf"
+binary = "librewolf"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8080, protocol = "tcp" },
     { port = 8443, protocol = "tcp" },
     { port = 2053, protocol = "tcp" },
     { port = 2083, protocol = "tcp" },
+    { port = 5228, protocol = "tcp" },
 ]
+
+# ─── Communication ───────────────────────────────────────────
+
+# Discord
+[[app]]
+name = "discord"
+binary = "Discord"
+enabled = true
+outbound = [
+    { port = 443,   protocol = "tcp" },   # API/WebSocket
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 2053,  protocol = "tcp" },   # Cloudflare
+    { port = 8443,  protocol = "tcp" },   # Cloudflare
+    { port = 50000, range_end = 65535, protocol = "udp" },  # Voice/video
+]
+
+# Signal Desktop
+[[app]]
+name = "signal"
+binary = "signal-deskto"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # API
+    { port = 80,   protocol = "tcp" },   # HTTP
+    { port = 10000, range_end = 20000, protocol = "udp" },  # Voice/video (TURN)
+]
+
+# Zoom
+[[app]]
+name = "zoom"
+binary = "zoom"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # API
+    { port = 80,   protocol = "tcp" },   # HTTP
+    { port = 8801, protocol = "udp" },   # Media
+    { port = 8802, protocol = "udp" },   # Media
+    { port = 3478, protocol = "udp" },   # STUN/TURN
+    { port = 3479, protocol = "udp" },   # STUN/TURN
+    { port = 5090, protocol = "tcp" },   # Zoom tunnel
+    { port = 5091, protocol = "tcp" },   # Zoom tunnel
+]
+
+# ─── Media ───────────────────────────────────────────────────
+
+# Spotify
+[[app]]
+name = "spotify"
+binary = "spotify"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # API/streaming
+    { port = 80,   protocol = "tcp" },   # HTTP
+    { port = 4070, protocol = "tcp" },   # Spotify protocol
+    { port = 8443, protocol = "tcp" },   # HTTPS alternate
+    { port = 57621, protocol = "udp" },  # Spotify Connect discovery
+]
+
+# ─── Development ─────────────────────────────────────────────
+
+# VS Code (code-oss)
+[[app]]
+name = "code-oss"
+binary = "code-oss"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Marketplace/extensions/GitHub
+    { port = 80,   protocol = "tcp" },   # HTTP
+    { port = 22,   protocol = "tcp" },   # SSH (Remote-SSH extension)
+    { port = 9418, protocol = "tcp" },   # Git protocol
+    { port = 8443, protocol = "tcp" },   # HTTPS alternate
+]
+
+# Git
+[[app]]
+name = "git"
+binary = "git"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # HTTPS (GitHub, GitLab)
+    { port = 80,   protocol = "tcp" },   # HTTP
+    { port = 22,   protocol = "tcp" },   # SSH
+    { port = 9418, protocol = "tcp" },   # Git protocol
+]
+
+# SSH
+[[app]]
+name = "ssh"
+binary = "ssh"
+enabled = true
+outbound = [
+    { port = 22,   protocol = "tcp" },   # SSH default
+    { port = 2222, protocol = "tcp" },   # SSH alternate
+    { port = 443,  protocol = "tcp" },   # SSH over HTTPS tunnels
+]
+
+# Docker
+[[app]]
+name = "dockerd"
+binary = "dockerd"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Registry pulls (Docker Hub, GHCR)
+    { port = 80,   protocol = "tcp" },   # HTTP
+]
+
+# containerd
+[[app]]
+name = "containerd"
+binary = "containerd"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Registry pulls
+    { port = 80,   protocol = "tcp" },   # HTTP
+]
+
+# ─── System / Package Management ────────────────────────────
+
+# curl
+[[app]]
+name = "curl"
+binary = "curl"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 22,   protocol = "tcp" },
+    { port = 21,   protocol = "tcp" },   # FTP
+    { port = 8080, protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
+]
+
+# wget
+[[app]]
+name = "wget"
+binary = "wget"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 21,   protocol = "tcp" },   # FTP
+    { port = 8080, protocol = "tcp" },
+]
+
+# pacman (Arch package manager)
+[[app]]
+name = "pacman"
+binary = "pacman"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # HTTPS mirrors
+    { port = 80,   protocol = "tcp" },   # HTTP mirrors
+]
+
+# yay (AUR helper)
+[[app]]
+name = "yay"
+binary = "yay"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # AUR/GitHub
+    { port = 80,   protocol = "tcp" },
+]
+
+# ─── Security ────────────────────────────────────────────────
+
+# ClamAV freshclam (virus definition updates)
+[[app]]
+name = "freshclam"
+binary = "freshclam"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # HTTPS updates
+    { port = 80,   protocol = "tcp" },   # HTTP updates
+]
+
+# ─── Productivity ────────────────────────────────────────────
+
+# Obsidian
+[[app]]
+name = "obsidian"
+binary = "obsidian"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Sync/plugins
+    { port = 80,   protocol = "tcp" },
+]
+
+# ─── Gaming ──────────────────────────────────────────────────
 
 # Steam
 [[app]]
@@ -51,8 +248,88 @@ name = "steam"
 binary = "steam"
 enabled = true
 outbound = [
-    { port = 443, protocol = "tcp" },
-    { port = 80,  protocol = "tcp" },
-    { port = 27015, range_end = 27050, protocol = "udp" },
-    { port = 27015, range_end = 27050, protocol = "tcp" },
+    { port = 443,   protocol = "tcp" },   # Store/API
+    { port = 80,    protocol = "tcp" },   # HTTP
+    { port = 8443,  protocol = "tcp" },   # HTTPS alternate
+    { port = 27015, range_end = 27050, protocol = "udp" },  # Game traffic
+    { port = 27015, range_end = 27050, protocol = "tcp" },  # Game traffic
+    { port = 4380,  protocol = "udp" },   # Steam P2P
+    { port = 3478,  protocol = "udp" },   # STUN/NAT traversal
+]
+
+# ─── Virtualization ──────────────────────────────────────────
+
+# VirtualBox
+[[app]]
+name = "virtualbox"
+binary = "VirtualBox"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Extension pack updates
+    { port = 80,   protocol = "tcp" },
+]
+
+# OBS Studio
+[[app]]
+name = "obs"
+binary = "obs"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },   # Streaming (Twitch/YouTube)
+    { port = 80,   protocol = "tcp" },
+    { port = 1935, protocol = "tcp" },   # RTMP streaming
+    { port = 1936, protocol = "tcp" },   # RTMP alternate
+]
+
+# ─── System Services ────────────────────────────────────────
+
+# systemd-resolved (DNS)
+[[app]]
+name = "systemd-resolve"
+binary = "systemd-resolve"
+enabled = true
+outbound = [
+    { port = 53,  protocol = "udp" },
+    { port = 53,  protocol = "tcp" },
+    { port = 853, protocol = "tcp" },    # DNS over TLS
+]
+
+# systemd-timesyncd (NTP)
+[[app]]
+name = "systemd-timesync"
+binary = "systemd-timesyn"
+enabled = true
+outbound = [
+    { port = 123, protocol = "udp" },    # NTP
+]
+
+# systemd-networkd
+[[app]]
+name = "systemd-network"
+binary = "systemd-network"
+enabled = true
+outbound = [
+    { port = 67, protocol = "udp" },     # DHCP
+    { port = 68, protocol = "udp" },     # DHCP
+]
+
+# iwd (wireless daemon)
+[[app]]
+name = "iwd"
+binary = "iwd"
+enabled = true
+outbound = [
+    { port = 67, protocol = "udp" },     # DHCP
+    { port = 68, protocol = "udp" },     # DHCP
+]
+
+# Electron (generic - used by many apps)
+[[app]]
+name = "electron"
+binary = "electron"
+enabled = true
+outbound = [
+    { port = 443,  protocol = "tcp" },
+    { port = 80,   protocol = "tcp" },
+    { port = 8443, protocol = "tcp" },
 ]
