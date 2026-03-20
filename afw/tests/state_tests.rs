@@ -861,3 +861,455 @@ fn full_lifecycle_three_apps_simultaneous() {
         .status_info()
         .contains("No monitored applications currently running."));
 }
+
+// ═══════════════════════════════════════════════════════════════
+// handle_connection tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn handle_connection_unknown_app_returns_true() {
+    let mut state = mock_state();
+    let is_new = state.handle_connection("mystery_app", 443, "tcp", "8.8.8.8");
+    assert!(is_new);
+}
+
+#[test]
+fn handle_connection_unknown_app_second_time_returns_false() {
+    let mut state = mock_state();
+    state.handle_connection("mystery_app", 443, "tcp", "8.8.8.8");
+    let is_new = state.handle_connection("mystery_app", 80, "tcp", "1.1.1.1");
+    assert!(!is_new);
+}
+
+#[test]
+fn handle_connection_known_app_returns_false() {
+    let mut state = mock_state();
+    // "Discord" is a configured binary
+    let is_new = state.handle_connection("Discord", 443, "tcp", "1.2.3.4");
+    assert!(!is_new);
+}
+
+#[test]
+fn handle_connection_tracks_ports() {
+    let mut state = mock_state();
+    state.handle_connection("myapp", 443, "tcp", "8.8.8.8");
+    state.handle_connection("myapp", 80, "tcp", "8.8.8.8");
+
+    let conns = state.unknown_connections();
+    let conn = conns.get("myapp").unwrap();
+    assert_eq!(conn.ports.len(), 2);
+    assert!(conn.ports.contains(&(443, "tcp".to_string())));
+    assert!(conn.ports.contains(&(80, "tcp".to_string())));
+}
+
+#[test]
+fn handle_connection_tracks_dest_addrs() {
+    let mut state = mock_state();
+    state.handle_connection("myapp", 443, "tcp", "8.8.8.8");
+    state.handle_connection("myapp", 443, "tcp", "1.1.1.1");
+
+    let conns = state.unknown_connections();
+    let conn = conns.get("myapp").unwrap();
+    assert_eq!(conn.dest_addrs.len(), 2);
+}
+
+#[test]
+fn handle_connection_increments_count() {
+    let mut state = mock_state();
+    state.handle_connection("myapp", 443, "tcp", "8.8.8.8");
+    state.handle_connection("myapp", 443, "tcp", "8.8.8.8");
+    state.handle_connection("myapp", 443, "tcp", "8.8.8.8");
+
+    let conns = state.unknown_connections();
+    let conn = conns.get("myapp").unwrap();
+    assert_eq!(conn.attempt_count, 3);
+}
+
+#[test]
+fn handle_connection_empty_comm_ignored() {
+    let mut state = mock_state();
+    let is_new = state.handle_connection("", 443, "tcp", "8.8.8.8");
+    assert!(!is_new);
+    assert!(state.unknown_connections().is_empty());
+}
+
+#[test]
+fn handle_connection_ignored_binary_returns_false() {
+    let mut state = mock_state();
+    // "curl" is in IGNORED_BINARIES
+    assert!(!state.handle_connection("curl", 443, "tcp", "8.8.8.8"));
+    assert!(!state.handle_connection("git", 443, "tcp", "8.8.8.8"));
+    assert!(!state.handle_connection("cargo", 443, "tcp", "8.8.8.8"));
+    assert!(!state.handle_connection("systemd", 443, "tcp", "8.8.8.8"));
+    assert!(state.unknown_connections().is_empty());
+}
+
+#[test]
+fn handle_connection_kworker_prefix_ignored() {
+    let mut state = mock_state();
+    assert!(!state.handle_connection("kworker/0:1", 443, "tcp", "8.8.8.8"));
+    assert!(!state.handle_connection("kworker/u8:0", 443, "tcp", "8.8.8.8"));
+}
+
+#[test]
+fn handle_connection_ksoftirqd_prefix_ignored() {
+    let mut state = mock_state();
+    assert!(!state.handle_connection("ksoftirqd/0", 443, "tcp", "8.8.8.8"));
+}
+
+#[test]
+fn handle_connection_denied_app_returns_false() {
+    let mut state = mock_state();
+    state.deny_app("badapp");
+    let is_new = state.handle_connection("badapp", 443, "tcp", "8.8.8.8");
+    assert!(!is_new);
+    assert!(state.unknown_connections().is_empty());
+}
+
+#[test]
+fn handle_connection_temp_allowed_app_returns_false() {
+    let mut state = mock_state();
+    // First register it as unknown
+    state.handle_connection("tempapp", 443, "tcp", "8.8.8.8");
+    // Allow once
+    state.allow_once("tempapp").unwrap();
+    // Now subsequent connections should return false
+    let is_new = state.handle_connection("tempapp", 80, "tcp", "1.1.1.1");
+    assert!(!is_new);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// allow_once tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn allow_once_unknown_app() {
+    let mut state = mock_state();
+    state.handle_connection("newapp", 443, "tcp", "8.8.8.8");
+    let result = state.allow_once("newapp").unwrap();
+    assert!(result.is_some());
+    let rules = result.unwrap();
+    assert_eq!(rules.len(), 1);
+    assert_eq!(rules[0].port, 443);
+    assert_eq!(rules[0].protocol, "tcp");
+}
+
+#[test]
+fn allow_once_clears_unknown_connections() {
+    let mut state = mock_state();
+    state.handle_connection("newapp", 443, "tcp", "8.8.8.8");
+    state.allow_once("newapp").unwrap();
+    assert!(!state.unknown_connections().contains_key("newapp"));
+}
+
+#[test]
+fn allow_once_adds_to_temp_allowed() {
+    let mut state = mock_state();
+    state.handle_connection("newapp", 443, "tcp", "8.8.8.8");
+    state.allow_once("newapp").unwrap();
+    assert!(state.temp_allowed().contains_key("newapp"));
+}
+
+#[test]
+fn allow_once_nonexistent_returns_none() {
+    let mut state = mock_state();
+    let result = state.allow_once("nonexistent").unwrap();
+    assert!(result.is_none());
+}
+
+#[test]
+fn allow_once_multiple_ports() {
+    let mut state = mock_state();
+    state.handle_connection("multi", 443, "tcp", "8.8.8.8");
+    state.handle_connection("multi", 80, "tcp", "1.1.1.1");
+    state.handle_connection("multi", 53, "udp", "8.8.4.4");
+    let result = state.allow_once("multi").unwrap();
+    assert!(result.is_some());
+    let rules = result.unwrap();
+    assert_eq!(rules.len(), 3);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// deny_app / undeny_app / is_denied tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn deny_app_adds_to_deny_list() {
+    let mut state = mock_state();
+    state.deny_app("badapp");
+    assert!(state.is_denied("badapp"));
+    assert!(state.deny_list().contains("badapp"));
+}
+
+#[test]
+fn deny_app_clears_unknown_connections() {
+    let mut state = mock_state();
+    state.handle_connection("badapp", 443, "tcp", "8.8.8.8");
+    state.deny_app("badapp");
+    assert!(!state.unknown_connections().contains_key("badapp"));
+}
+
+#[test]
+fn undeny_app_removes_from_deny_list() {
+    let mut state = mock_state();
+    state.deny_app("badapp");
+    assert!(state.is_denied("badapp"));
+    state.undeny_app("badapp");
+    assert!(!state.is_denied("badapp"));
+}
+
+#[test]
+fn is_denied_false_for_unknown() {
+    let state = mock_state();
+    assert!(!state.is_denied("anything"));
+}
+
+#[test]
+fn deny_multiple_apps() {
+    let mut state = mock_state();
+    state.deny_app("app1");
+    state.deny_app("app2");
+    state.deny_app("app3");
+    assert_eq!(state.deny_list().len(), 3);
+    assert!(state.is_denied("app1"));
+    assert!(state.is_denied("app2"));
+    assert!(state.is_denied("app3"));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// remove_temp_rules tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn remove_temp_rules_removes_from_temp_allowed() {
+    let mut state = mock_state();
+    state.handle_connection("tempapp", 443, "tcp", "8.8.8.8");
+    state.allow_once("tempapp").unwrap();
+    assert!(state.temp_allowed().contains_key("tempapp"));
+    state.remove_temp_rules("tempapp").unwrap();
+    assert!(!state.temp_allowed().contains_key("tempapp"));
+}
+
+#[test]
+fn remove_temp_rules_nonexistent_noop() {
+    let mut state = mock_state();
+    // Should not error
+    state.remove_temp_rules("nonexistent").unwrap();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// check_aggregation_windows tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn check_aggregation_windows_empty_returns_empty() {
+    let mut state = mock_state();
+    let summaries = state.check_aggregation_windows();
+    assert!(summaries.is_empty());
+}
+
+#[test]
+fn check_aggregation_windows_new_connection_not_ready() {
+    let mut state = mock_state();
+    state.handle_connection("newapp", 443, "tcp", "8.8.8.8");
+    // Immediately checking: the aggregation window hasn't elapsed
+    let summaries = state.check_aggregation_windows();
+    // Likely empty since AGGREGATION_WINDOW_SECS hasn't elapsed
+    assert!(summaries.is_empty());
+}
+
+#[test]
+fn check_aggregation_windows_marks_summary_emitted() {
+    let mut state = mock_state();
+    state.handle_connection("newapp", 443, "tcp", "8.8.8.8");
+    // Directly check that summary_emitted starts false
+    let conn = state.unknown_connections().get("newapp").unwrap();
+    assert!(!conn.summary_emitted);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// unknown_connections_info tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn unknown_connections_info_no_connections() {
+    let state = mock_state();
+    let info = state.unknown_connections_info();
+    assert!(info.contains("No unknown connection attempts."));
+}
+
+#[test]
+fn unknown_connections_info_with_connections() {
+    let mut state = mock_state();
+    state.handle_connection("mystery", 443, "tcp", "8.8.8.8");
+    let info = state.unknown_connections_info();
+    assert!(info.contains("mystery"));
+    assert!(info.contains("443/tcp"));
+    assert!(info.contains("Suggest:"));
+}
+
+#[test]
+fn unknown_connections_info_with_temp_allowed() {
+    let mut state = mock_state();
+    state.handle_connection("tempapp", 443, "tcp", "8.8.8.8");
+    state.allow_once("tempapp").unwrap();
+    let info = state.unknown_connections_info();
+    assert!(info.contains("Temporarily allowed:"));
+    assert!(info.contains("tempapp"));
+}
+
+#[test]
+fn unknown_connections_info_with_deny_list() {
+    let mut state = mock_state();
+    state.deny_app("evilapp");
+    let info = state.unknown_connections_info();
+    assert!(info.contains("Permanently denied:"));
+    assert!(info.contains("evilapp"));
+}
+
+#[test]
+fn unknown_connections_info_shows_dest_addrs() {
+    let mut state = mock_state();
+    state.handle_connection("ipapp", 443, "tcp", "8.8.8.8");
+    state.handle_connection("ipapp", 443, "tcp", "1.1.1.1");
+    let info = state.unknown_connections_info();
+    assert!(info.contains("IPs:"));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// clear_unknown tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn clear_unknown_removes_entry() {
+    let mut state = mock_state();
+    state.handle_connection("clearme", 443, "tcp", "8.8.8.8");
+    assert!(state.unknown_connections().contains_key("clearme"));
+    state.clear_unknown("clearme");
+    assert!(!state.unknown_connections().contains_key("clearme"));
+}
+
+#[test]
+fn clear_unknown_nonexistent_noop() {
+    let mut state = mock_state();
+    // Should not panic
+    state.clear_unknown("nonexistent");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UnknownConnectionSummary::suggested_command tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn suggested_command_basic() {
+    use afw::state::UnknownConnectionSummary;
+    let summary = UnknownConnectionSummary {
+        binary: "MyApp".into(),
+        ports: vec![(443, "tcp".into())],
+        dest_addrs: vec!["8.8.8.8".into()],
+        attempt_count: 1,
+    };
+    let cmd = summary.suggested_command();
+    assert_eq!(cmd, "afw add myapp MyApp 443/tcp");
+}
+
+#[test]
+fn suggested_command_multiple_ports() {
+    use afw::state::UnknownConnectionSummary;
+    let summary = UnknownConnectionSummary {
+        binary: "Game".into(),
+        ports: vec![(443, "tcp".into()), (27015, "udp".into())],
+        dest_addrs: vec![],
+        attempt_count: 5,
+    };
+    let cmd = summary.suggested_command();
+    assert!(cmd.starts_with("afw add game Game"));
+    assert!(cmd.contains("443/tcp"));
+    assert!(cmd.contains("27015/udp"));
+}
+
+#[test]
+fn suggested_command_binary_with_spaces() {
+    use afw::state::UnknownConnectionSummary;
+    let summary = UnknownConnectionSummary {
+        binary: "My App".into(),
+        ports: vec![(80, "tcp".into())],
+        dest_addrs: vec![],
+        attempt_count: 1,
+    };
+    let cmd = summary.suggested_command();
+    // Spaces in binary become hyphens in the name
+    assert!(cmd.contains("my-app"));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IGNORED_BINARIES coverage
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn ignored_binaries_system_processes() {
+    let mut state = mock_state();
+    let system_bins = vec![
+        "systemd",
+        "systemd-resolve",
+        "systemd-timesyn",
+        "dbus-broker",
+    ];
+    for bin in system_bins {
+        assert!(
+            !state.handle_connection(bin, 443, "tcp", "1.2.3.4"),
+            "{} should be ignored",
+            bin
+        );
+    }
+}
+
+#[test]
+fn ignored_binaries_package_managers() {
+    let mut state = mock_state();
+    let pkg_bins = vec![
+        "pacman", "yay", "apt", "apt-get", "dpkg", "dnf", "yum", "flatpak", "snap", "brew",
+    ];
+    for bin in pkg_bins {
+        assert!(
+            !state.handle_connection(bin, 443, "tcp", "1.2.3.4"),
+            "{} should be ignored",
+            bin
+        );
+    }
+}
+
+#[test]
+fn ignored_binaries_build_tools() {
+    let mut state = mock_state();
+    let build_bins = vec!["gcc", "clang", "rustc", "make", "cmake", "ninja"];
+    for bin in build_bins {
+        assert!(
+            !state.handle_connection(bin, 443, "tcp", "1.2.3.4"),
+            "{} should be ignored",
+            bin
+        );
+    }
+}
+
+#[test]
+fn non_ignored_binary_tracked() {
+    let mut state = mock_state();
+    // "my_custom_app" is not in IGNORED_BINARIES
+    assert!(state.handle_connection("my_custom_app", 443, "tcp", "1.2.3.4"));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// handle_exit removes temp-allowed app rules
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn handle_exit_removes_temp_allowed_rules() {
+    let mut state = mock_state();
+    state.handle_connection("tempbin", 443, "tcp", "8.8.8.8");
+    state.allow_once("tempbin").unwrap();
+    assert!(state.temp_allowed().contains_key("tempbin"));
+    // Exit event for temp-allowed app should remove temp rules
+    state.handle_exit(1000, "tempbin").unwrap();
+    assert!(!state.temp_allowed().contains_key("tempbin"));
+}

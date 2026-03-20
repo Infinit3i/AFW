@@ -433,6 +433,11 @@ impl AppState {
             None => return Ok(None),
         };
 
+        // Validate binary name before using it in nftables rules to prevent injection
+        let app_name = binary.to_lowercase().replace(' ', "-");
+        crate::config::validate_name(&app_name)?;
+        crate::config::validate_name(binary)?;
+
         let port_rules: Vec<crate::config::PortRule> = conn
             .ports
             .iter()
@@ -447,7 +452,6 @@ impl AppState {
             return Ok(None);
         }
 
-        let app_name = binary.to_lowercase().replace(' ', "-");
         info!(
             "Temporarily allowing '{}' with {} port(s)",
             binary,

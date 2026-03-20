@@ -137,6 +137,15 @@ pub async fn run() -> Result<()> {
                                             crate::config::PortRule { port: *port, range_end: None, protocol: proto.clone() }
                                         }).collect();
                                         let app_name = binary.to_lowercase().replace(' ', "-");
+                                        // Validate names before using in nft rules / config
+                                        if let Err(e) = crate::config::validate_name(&app_name) {
+                                            error!("Invalid app name '{}': {}", app_name, e);
+                                            return;
+                                        }
+                                        if let Err(e) = crate::config::validate_name(&binary) {
+                                            error!("Invalid binary name '{}': {}", binary, e);
+                                            return;
+                                        }
                                         let mut cfg = state.config().clone();
                                         cfg.app.push(crate::config::AppConfig {
                                             name: app_name.clone(),

@@ -1,5 +1,5 @@
-use afw::ebpf_loader::comm_to_string;
-use afw_common::{ProcessEvent, EVENT_EXEC, EVENT_EXIT};
+use afw::ebpf_loader::{comm_to_string, ipv4_to_string};
+use afw_common::{ConnectionEvent, ProcessEvent, EVENT_EXEC, EVENT_EXIT, PROTO_TCP, PROTO_UDP};
 
 fn make_comm(s: &str) -> [u8; 16] {
     let mut comm = [0u8; 16];
@@ -392,4 +392,241 @@ fn process_event_ptr_read_unaligned_simulation() {
     assert_eq!(recovered.pid, 12345);
     assert_eq!(recovered.event_type, EVENT_EXIT);
     assert_eq!(comm_to_string(&recovered.comm), "firefox");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ipv4_to_string tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn ipv4_loopback() {
+    // 127.0.0.1 in network byte order: 0x7f000001
+    assert_eq!(ipv4_to_string(0x7f000001), "127.0.0.1");
+}
+
+#[test]
+fn ipv4_all_zeros() {
+    assert_eq!(ipv4_to_string(0), "0.0.0.0");
+}
+
+#[test]
+fn ipv4_all_ones() {
+    assert_eq!(ipv4_to_string(0xFFFFFFFF), "255.255.255.255");
+}
+
+#[test]
+fn ipv4_google_dns() {
+    // 8.8.8.8 = 0x08080808
+    assert_eq!(ipv4_to_string(0x08080808), "8.8.8.8");
+}
+
+#[test]
+fn ipv4_class_c_network() {
+    // 192.168.1.1 = 0xC0A80101
+    assert_eq!(ipv4_to_string(0xC0A80101), "192.168.1.1");
+}
+
+#[test]
+fn ipv4_class_a_private() {
+    // 10.0.0.1 = 0x0A000001
+    assert_eq!(ipv4_to_string(0x0A000001), "10.0.0.1");
+}
+
+#[test]
+fn ipv4_each_octet_distinct() {
+    // 1.2.3.4 = 0x01020304
+    assert_eq!(ipv4_to_string(0x01020304), "1.2.3.4");
+}
+
+#[test]
+fn ipv4_high_octets() {
+    // 255.254.253.252
+    assert_eq!(ipv4_to_string(0xFFFEFDFC), "255.254.253.252");
+}
+
+#[test]
+fn ipv4_output_has_three_dots() {
+    let result = ipv4_to_string(0x01020304);
+    assert_eq!(result.matches('.').count(), 3);
+}
+
+#[test]
+fn ipv4_link_local() {
+    // 169.254.0.1 = 0xA9FE0001
+    assert_eq!(ipv4_to_string(0xA9FE0001), "169.254.0.1");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Protocol constants tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn proto_tcp_is_6() {
+    assert_eq!(PROTO_TCP, 6);
+}
+
+#[test]
+fn proto_udp_is_17() {
+    assert_eq!(PROTO_UDP, 17);
+}
+
+#[test]
+fn proto_tcp_udp_differ() {
+    assert_ne!(PROTO_TCP, PROTO_UDP);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ConnectionEvent struct tests
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn connection_event_create() {
+    let event = ConnectionEvent {
+        pid: 1234,
+        dest_port: 443,
+        protocol: PROTO_TCP,
+        _pad: 0,
+        dest_addr: 0x08080808, // 8.8.8.8
+        comm: make_comm("firefox"),
+    };
+    assert_eq!(event.pid, 1234);
+    assert_eq!(event.dest_port, 443);
+    assert_eq!(event.protocol, PROTO_TCP);
+    assert_eq!(ipv4_to_string(event.dest_addr), "8.8.8.8");
+    assert_eq!(comm_to_string(&event.comm), "firefox");
+}
+
+#[test]
+fn connection_event_udp() {
+    let event = ConnectionEvent {
+        pid: 5678,
+        dest_port: 53,
+        protocol: PROTO_UDP,
+        _pad: 0,
+        dest_addr: 0x0A000001, // 10.0.0.1
+        comm: make_comm("dnsresolve"),
+    };
+    assert_eq!(event.protocol, PROTO_UDP);
+    assert_eq!(event.dest_port, 53);
+}
+
+#[test]
+fn connection_event_is_copy() {
+    let event = ConnectionEvent {
+        pid: 100,
+        dest_port: 80,
+        protocol: PROTO_TCP,
+        _pad: 0,
+        dest_addr: 0x01020304,
+        comm: make_comm("test"),
+    };
+    let copy = event; // Copy
+    assert_eq!(event.pid, copy.pid);
+    assert_eq!(event.dest_port, copy.dest_port);
+}
+
+#[test]
+fn connection_event_clone() {
+    let event = ConnectionEvent {
+        pid: 200,
+        dest_port: 8080,
+        protocol: PROTO_TCP,
+        _pad: 0,
+        dest_addr: 0xC0A80101,
+        comm: make_comm("app"),
+    };
+    let cloned = event.clone();
+    assert_eq!(cloned.pid, event.pid);
+    assert_eq!(cloned.dest_port, event.dest_port);
+    assert_eq!(cloned.dest_addr, event.dest_addr);
+}
+
+#[test]
+fn connection_event_size() {
+    // ConnectionEvent is repr(C): u32(4) + u16(2) + u8(1) + u8(1) + u32(4) + [u8;16](16) = 28 bytes
+    assert_eq!(std::mem::size_of::<ConnectionEvent>(), 28);
+}
+
+#[test]
+fn connection_event_alignment() {
+    // repr(C) with u32 as largest field means 4-byte alignment
+    assert_eq!(std::mem::align_of::<ConnectionEvent>(), 4);
+}
+
+#[test]
+fn connection_event_field_offsets() {
+    assert_eq!(std::mem::offset_of!(ConnectionEvent, pid), 0);
+    assert_eq!(std::mem::offset_of!(ConnectionEvent, dest_port), 4);
+    assert_eq!(std::mem::offset_of!(ConnectionEvent, protocol), 6);
+    assert_eq!(std::mem::offset_of!(ConnectionEvent, _pad), 7);
+    assert_eq!(std::mem::offset_of!(ConnectionEvent, dest_addr), 8);
+    assert_eq!(std::mem::offset_of!(ConnectionEvent, comm), 12);
+}
+
+#[test]
+fn connection_event_bytes_roundtrip() {
+    let original = ConnectionEvent {
+        pid: 42,
+        dest_port: 443,
+        protocol: PROTO_TCP,
+        _pad: 0,
+        dest_addr: 0x08080808,
+        comm: make_comm("test"),
+    };
+    let bytes: [u8; 28] = unsafe { std::mem::transmute(original) };
+    let recovered: ConnectionEvent = unsafe { std::mem::transmute(bytes) };
+    assert_eq!(recovered.pid, 42);
+    assert_eq!(recovered.dest_port, 443);
+    assert_eq!(recovered.protocol, PROTO_TCP);
+    assert_eq!(recovered.dest_addr, 0x08080808);
+    assert_eq!(comm_to_string(&recovered.comm), "test");
+}
+
+#[test]
+fn connection_event_max_port() {
+    let event = ConnectionEvent {
+        pid: 1,
+        dest_port: u16::MAX,
+        protocol: PROTO_TCP,
+        _pad: 0,
+        dest_addr: 0,
+        comm: make_comm("x"),
+    };
+    assert_eq!(event.dest_port, 65535);
+}
+
+#[test]
+fn connection_event_zero_port() {
+    let event = ConnectionEvent {
+        pid: 1,
+        dest_port: 0,
+        protocol: PROTO_UDP,
+        _pad: 0,
+        dest_addr: 0,
+        comm: [0u8; 16],
+    };
+    assert_eq!(event.dest_port, 0);
+}
+
+#[test]
+fn connection_event_ptr_read_unaligned_simulation() {
+    let event = ConnectionEvent {
+        pid: 99999,
+        dest_port: 8443,
+        protocol: PROTO_TCP,
+        _pad: 0,
+        dest_addr: 0xC0A80101,
+        comm: make_comm("chrome"),
+    };
+    let bytes = unsafe {
+        std::slice::from_raw_parts(
+            &event as *const ConnectionEvent as *const u8,
+            std::mem::size_of::<ConnectionEvent>(),
+        )
+    };
+    let recovered: ConnectionEvent =
+        unsafe { std::ptr::read_unaligned(bytes.as_ptr() as *const ConnectionEvent) };
+    assert_eq!(recovered.pid, 99999);
+    assert_eq!(recovered.dest_port, 8443);
+    assert_eq!(comm_to_string(&recovered.comm), "chrome");
 }

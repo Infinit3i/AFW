@@ -389,6 +389,162 @@ fn command_debug_format() {
     assert!(debug_str.contains("Status"));
 }
 
+// ═══════════════════════════════════════════════════════════════
+// New commands: Pending, Approve, AllowOnce, Deny
+// ═══════════════════════════════════════════════════════════════
+
+#[test]
+fn serialize_pending_command() {
+    let cmd = Command::Pending;
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: Command = serde_json::from_str(&json).unwrap();
+    assert!(matches!(deserialized, Command::Pending));
+}
+
+#[test]
+fn serialize_approve_command() {
+    let cmd = Command::Approve {
+        binary: "MyApp".into(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: Command = serde_json::from_str(&json).unwrap();
+    match deserialized {
+        Command::Approve { binary } => assert_eq!(binary, "MyApp"),
+        _ => panic!("Expected Approve command"),
+    }
+}
+
+#[test]
+fn serialize_allow_once_command() {
+    let cmd = Command::AllowOnce {
+        binary: "tempapp".into(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: Command = serde_json::from_str(&json).unwrap();
+    match deserialized {
+        Command::AllowOnce { binary } => assert_eq!(binary, "tempapp"),
+        _ => panic!("Expected AllowOnce command"),
+    }
+}
+
+#[test]
+fn serialize_deny_command() {
+    let cmd = Command::Deny {
+        binary: "badapp".into(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: Command = serde_json::from_str(&json).unwrap();
+    match deserialized {
+        Command::Deny { binary } => assert_eq!(binary, "badapp"),
+        _ => panic!("Expected Deny command"),
+    }
+}
+
+#[test]
+fn serialize_approve_with_special_chars() {
+    let cmd = Command::Approve {
+        binary: "My-App_v2.0".into(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: Command = serde_json::from_str(&json).unwrap();
+    match deserialized {
+        Command::Approve { binary } => assert_eq!(binary, "My-App_v2.0"),
+        _ => panic!("Expected Approve"),
+    }
+}
+
+#[test]
+fn serialize_allow_once_with_spaces() {
+    let cmd = Command::AllowOnce {
+        binary: "Web Content".into(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: Command = serde_json::from_str(&json).unwrap();
+    match deserialized {
+        Command::AllowOnce { binary } => assert_eq!(binary, "Web Content"),
+        _ => panic!("Expected AllowOnce"),
+    }
+}
+
+#[test]
+fn serialize_deny_with_dashes() {
+    let cmd = Command::Deny {
+        binary: "some-evil-app".into(),
+    };
+    let json = serde_json::to_string(&cmd).unwrap();
+    let deserialized: Command = serde_json::from_str(&json).unwrap();
+    match deserialized {
+        Command::Deny { binary } => assert_eq!(binary, "some-evil-app"),
+        _ => panic!("Expected Deny"),
+    }
+}
+
+#[test]
+fn clone_approve_command() {
+    let cmd = Command::Approve {
+        binary: "test".into(),
+    };
+    let cloned = cmd.clone();
+    match cloned {
+        Command::Approve { binary } => assert_eq!(binary, "test"),
+        _ => panic!("Expected Approve"),
+    }
+}
+
+#[test]
+fn clone_allow_once_command() {
+    let cmd = Command::AllowOnce {
+        binary: "test".into(),
+    };
+    let cloned = cmd.clone();
+    match cloned {
+        Command::AllowOnce { binary } => assert_eq!(binary, "test"),
+        _ => panic!("Expected AllowOnce"),
+    }
+}
+
+#[test]
+fn clone_deny_command() {
+    let cmd = Command::Deny {
+        binary: "test".into(),
+    };
+    let cloned = cmd.clone();
+    match cloned {
+        Command::Deny { binary } => assert_eq!(binary, "test"),
+        _ => panic!("Expected Deny"),
+    }
+}
+
+#[test]
+fn debug_format_new_commands() {
+    let pending = format!("{:?}", Command::Pending);
+    assert!(pending.contains("Pending"));
+
+    let approve = format!("{:?}", Command::Approve { binary: "x".into() });
+    assert!(approve.contains("Approve"));
+
+    let allow = format!("{:?}", Command::AllowOnce { binary: "x".into() });
+    assert!(allow.contains("AllowOnce"));
+
+    let deny = format!("{:?}", Command::Deny { binary: "x".into() });
+    assert!(deny.contains("Deny"));
+}
+
+#[test]
+fn new_commands_json_are_distinct() {
+    let pending = serde_json::to_string(&Command::Pending).unwrap();
+    let approve = serde_json::to_string(&Command::Approve { binary: "x".into() }).unwrap();
+    let allow_once = serde_json::to_string(&Command::AllowOnce { binary: "x".into() }).unwrap();
+    let deny = serde_json::to_string(&Command::Deny { binary: "x".into() }).unwrap();
+
+    assert_ne!(pending, approve);
+    assert_ne!(pending, allow_once);
+    assert_ne!(pending, deny);
+    assert_ne!(approve, allow_once);
+    assert_ne!(approve, deny);
+    assert_ne!(allow_once, deny);
+}
+
 #[test]
 fn all_commands_json_are_distinct() {
     let commands = vec![
@@ -397,6 +553,7 @@ fn all_commands_json_are_distinct() {
         serde_json::to_string(&Command::Reload).unwrap(),
         serde_json::to_string(&Command::Rules).unwrap(),
         serde_json::to_string(&Command::Daemon).unwrap(),
+        serde_json::to_string(&Command::Pending).unwrap(),
     ];
     for i in 0..commands.len() {
         for j in (i + 1)..commands.len() {
