@@ -127,6 +127,10 @@ pub struct AppState {
     nft: Box<dyn NftBackend>,
     /// Unknown apps that tried to connect (binary -> connection info)
     unknown_connections: HashMap<String, UnknownConnection>,
+    /// Temporarily allowed apps (binary -> port rules, removed on exit/restart)
+    temp_allowed: HashMap<String, Vec<crate::config::PortRule>>,
+    /// Permanently denied apps (binary names, suppresses notifications)
+    deny_list: HashSet<String>,
 }
 
 impl AppState {
@@ -148,6 +152,8 @@ impl AppState {
             config,
             nft,
             unknown_connections: HashMap::new(),
+            temp_allowed: HashMap::new(),
+            deny_list: HashSet::new(),
         }
     }
 
@@ -185,6 +191,13 @@ impl AppState {
 
     /// Handle a process exit event
     pub fn handle_exit(&mut self, pid: u32, comm: &str) -> Result<()> {
+        // Check if this is a temp-allowed app exiting
+        if self.temp_allowed.contains_key(comm) {
+            // For temp-allowed apps, we don't track PIDs individually,
+            // so just remove on first exit event we see
+            self.remove_temp_rules(comm)?;
+        }
+
         let app_name = match self.binary_map.get(comm) {
             Some(name) => name.clone(),
             None => return Ok(()),
@@ -227,6 +240,16 @@ impl AppState {
     ) -> bool {
         // Known app — nftables already has rules, nothing to do
         if self.binary_map.contains_key(comm) {
+            return false;
+        }
+
+        // Temporarily allowed app — already has rules
+        if self.temp_allowed.contains_key(comm) {
+            return false;
+        }
+
+        // Permanently denied — silently ignore, don't notify
+        if self.deny_list.contains(comm) {
             return false;
         }
 
@@ -284,8 +307,34 @@ impl AppState {
     /// Get unknown connections summary for display
     pub fn unknown_connections_info(&self) -> String {
         let mut out = String::new();
+
+        if !self.temp_allowed.is_empty() {
+            out.push_str(&format!(
+                "Temporarily allowed: {}\n",
+                self.temp_allowed.len()
+            ));
+            for (binary, rules) in &self.temp_allowed {
+                let ports: Vec<String> = rules
+                    .iter()
+                    .map(|r| format!("{}/{}", r.port, r.protocol))
+                    .collect();
+                out.push_str(&format!("  {} [{}]\n", binary, ports.join(", ")));
+            }
+            out.push('\n');
+        }
+
+        if !self.deny_list.is_empty() {
+            out.push_str(&format!("Permanently denied: {}\n", self.deny_list.len()));
+            for binary in &self.deny_list {
+                out.push_str(&format!("  {}\n", binary));
+            }
+            out.push('\n');
+        }
+
         if self.unknown_connections.is_empty() {
-            out.push_str("No unknown connection attempts.\n");
+            if self.temp_allowed.is_empty() && self.deny_list.is_empty() {
+                out.push_str("No unknown connection attempts.\n");
+            }
             return out;
         }
 
@@ -374,6 +423,79 @@ impl AppState {
     /// Clear unknown connection tracking for a specific app (e.g. after approval)
     pub fn clear_unknown(&mut self, binary: &str) {
         self.unknown_connections.remove(binary);
+    }
+
+    /// Temporarily allow an app (rules added now, removed on exit or daemon restart).
+    /// Uses the ports detected in unknown_connections.
+    pub fn allow_once(&mut self, binary: &str) -> Result<Option<Vec<crate::config::PortRule>>> {
+        let conn = match self.unknown_connections.get(binary) {
+            Some(c) => c.clone(),
+            None => return Ok(None),
+        };
+
+        let port_rules: Vec<crate::config::PortRule> = conn
+            .ports
+            .iter()
+            .map(|(port, proto)| crate::config::PortRule {
+                port: *port,
+                range_end: None,
+                protocol: proto.clone(),
+            })
+            .collect();
+
+        if port_rules.is_empty() {
+            return Ok(None);
+        }
+
+        let app_name = binary.to_lowercase().replace(' ', "-");
+        info!(
+            "Temporarily allowing '{}' with {} port(s)",
+            binary,
+            port_rules.len()
+        );
+        self.nft.add_app_rules(&app_name, &port_rules)?;
+        self.temp_allowed
+            .insert(binary.to_string(), port_rules.clone());
+        self.unknown_connections.remove(binary);
+
+        Ok(Some(port_rules))
+    }
+
+    /// Remove temporary rules for an app (called on exit or cleanup)
+    pub fn remove_temp_rules(&mut self, binary: &str) -> Result<()> {
+        if self.temp_allowed.remove(binary).is_some() {
+            let app_name = binary.to_lowercase().replace(' ', "-");
+            info!("Removing temporary rules for '{}'", binary);
+            self.nft.remove_app_rules(&app_name)?;
+        }
+        Ok(())
+    }
+
+    /// Add a binary to the permanent deny list
+    pub fn deny_app(&mut self, binary: &str) {
+        info!("Permanently denying '{}'", binary);
+        self.deny_list.insert(binary.to_string());
+        self.unknown_connections.remove(binary);
+    }
+
+    /// Remove a binary from the deny list
+    pub fn undeny_app(&mut self, binary: &str) {
+        self.deny_list.remove(binary);
+    }
+
+    /// Check if a binary is denied
+    pub fn is_denied(&self, binary: &str) -> bool {
+        self.deny_list.contains(binary)
+    }
+
+    /// Get the deny list
+    pub fn deny_list(&self) -> &HashSet<String> {
+        &self.deny_list
+    }
+
+    /// Get temporarily allowed apps
+    pub fn temp_allowed(&self) -> &HashMap<String, Vec<crate::config::PortRule>> {
+        &self.temp_allowed
     }
 
     /// Scan /proc for already-running monitored processes

@@ -69,9 +69,21 @@ pub enum Command {
     /// Show unknown apps that attempted connections (blocked by default-drop)
     Pending,
 
-    /// Approve a blocked unknown app (auto-adds rules based on detected ports)
+    /// Approve a blocked unknown app permanently (saves to config)
     Approve {
         /// Binary/process name to approve (as shown in `afw pending`)
+        binary: String,
+    },
+
+    /// Allow a blocked app temporarily (rules removed on app exit or daemon restart)
+    AllowOnce {
+        /// Binary/process name to allow once
+        binary: String,
+    },
+
+    /// Permanently deny an app (add to deny list, suppresses future notifications)
+    Deny {
+        /// Binary/process name to deny
         binary: String,
     },
 }

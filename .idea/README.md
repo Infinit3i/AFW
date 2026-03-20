@@ -26,12 +26,12 @@
 - [x] Rate-limit notifications to prevent spam (max 1 per app per 30 seconds)
 
 ### Phase 4: User Response Handling
-- [ ] **Allow Once**: add temporary nft rules for this app (removed on app exit or daemon restart)
-- [ ] **Always Allow**: save app config to `/etc/afw/conf.d/user_approved.toml` and reload
-- [ ] **Deny**: log the denial, do nothing (default-drop handles it)
-- [ ] `afw approve <name>` CLI command for headless/SSH use
-- [ ] `afw deny <name>` CLI command to permanently block (add to deny list)
-- [ ] `afw pending` CLI command to show apps waiting for approval
+- [x] **Allow Once**: `afw allow-once <binary>` — temporary nft rules removed on app exit or daemon restart
+- [x] **Always Allow**: `afw approve <binary>` — saves to config and reloads
+- [x] **Deny**: `afw deny <binary>` — permanently blocks, suppresses future notifications
+- [x] `afw approve <binary>` CLI command for headless/SSH use
+- [x] `afw deny <binary>` CLI command to permanently block (deny list in memory)
+- [x] `afw pending` CLI command to show blocked, temp-allowed, and denied apps
 
 ## Future Ideas (not scoped yet)
 - Per-app IP/CIDR allow/deny lists

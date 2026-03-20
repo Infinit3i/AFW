@@ -77,6 +77,8 @@ fn requires_privilege(cmd: &Command) -> bool {
             | Command::Enable { .. }
             | Command::Disable { .. }
             | Command::Approve { .. }
+            | Command::AllowOnce { .. }
+            | Command::Deny { .. }
             | Command::Reload
     )
 }
@@ -399,6 +401,54 @@ async fn process_command(cmd: Command, state: Arc<Mutex<AppState>>) -> DaemonRes
                         binary
                     ),
                 },
+            }
+        }
+        Command::AllowOnce { binary } => {
+            let mut state = state.lock().await;
+            match state.allow_once(&binary) {
+                Ok(Some(rules)) => {
+                    let port_desc: Vec<String> = rules
+                        .iter()
+                        .map(|p| format!("{}/{}", p.port, p.protocol))
+                        .collect();
+                    DaemonResponse {
+                        success: true,
+                        message: format!(
+                            "Temporarily allowed '{}' with ports: {} (removed on exit/restart)",
+                            binary,
+                            port_desc.join(", ")
+                        ),
+                    }
+                }
+                Ok(None) => DaemonResponse {
+                    success: false,
+                    message: format!(
+                        "No pending connections for '{}'. Run `afw pending` to see blocked apps.",
+                        binary
+                    ),
+                },
+                Err(e) => DaemonResponse {
+                    success: false,
+                    message: format!("Failed to allow '{}': {}", binary, e),
+                },
+            }
+        }
+        Command::Deny { binary } => {
+            let mut state = state.lock().await;
+            if state.is_denied(&binary) {
+                DaemonResponse {
+                    success: false,
+                    message: format!("'{}' is already denied", binary),
+                }
+            } else {
+                state.deny_app(&binary);
+                DaemonResponse {
+                    success: true,
+                    message: format!(
+                        "Permanently denied '{}'. Future connection attempts will be silently blocked.",
+                        binary
+                    ),
+                }
             }
         }
         Command::Daemon => DaemonResponse {
