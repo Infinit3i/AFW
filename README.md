@@ -75,6 +75,10 @@ afw disable <name>      # Disable an app
 afw reload              # Reload config from disk
 ```
 
+## Roadmap
+
+See [.idea/README.md](.idea/README.md) for the feature roadmap, including interactive connection control (Little Snitch-style allow/deny prompts for unknown apps).
+
 ## License
 
 GPL-3.0-or-later
