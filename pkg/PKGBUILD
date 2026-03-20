@@ -1,6 +1,6 @@
 # Maintainer: infinit3i
 pkgname=afw
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Application Firewall - eBPF process monitoring with dynamic nftables rules"
 arch=('x86_64')

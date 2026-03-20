@@ -1,6 +1,6 @@
 [package]
 name = "afw"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Application Firewall - eBPF process monitoring with dynamic nftables rules"
 license = "GPL-3.0-or-later"
