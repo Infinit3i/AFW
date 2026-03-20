@@ -158,8 +158,8 @@ impl AppState {
     /// Get current status info
     pub fn status_info(&self) -> String {
         let mut out = String::new();
-        out.push_str("AFW Status\n");
-        out.push_str("══════════\n\n");
+        out.push_str(crate::banner::STATUS_HEADER);
+        out.push_str("  ─────────────────────────\n\n");
 
         out.push_str(&format!("Monitored apps: {}\n", self.config.app.len()));
 

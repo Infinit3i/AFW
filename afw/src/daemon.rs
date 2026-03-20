@@ -13,6 +13,8 @@ use crate::nft::{NftBackend, RealNftBackend};
 use crate::state::AppState;
 
 pub async fn run() -> Result<()> {
+    // Print banner on startup
+    eprintln!("{}", crate::banner::BANNER);
     info!("AFW daemon starting...");
 
     let config = Config::load(None).context("Failed to load configuration")?;

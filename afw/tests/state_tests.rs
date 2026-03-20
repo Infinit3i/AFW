@@ -359,8 +359,7 @@ fn rapid_exec_exit_same_pid() {
 fn status_info_contains_header() {
     let state = mock_state();
     let status = state.status_info();
-    assert!(status.contains("AFW Status"));
-    assert!(status.contains("══════════"));
+    assert!(status.contains("_/\\_/")); // AFW ASCII art closing line
 }
 
 #[test]

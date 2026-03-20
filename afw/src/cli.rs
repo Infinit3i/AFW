@@ -2,7 +2,18 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 #[derive(Parser)]
-#[command(name = "afw", about = "AFW - Application Firewall", version)]
+#[command(
+    name = "afw",
+    about = "AFW - Application Firewall\n\n  eBPF-powered per-application outbound firewall for Linux.\n  Monitors process exec/exit and dynamically manages nftables rules.",
+    version,
+    before_help = r#"
+     _    _______        __
+    / \  |  ___\ \      / /
+   / _ \ | |_   \ \ /\ / /
+  / ___ \|  _|   \ V  V /
+ /_/   \_\_|      \_/\_/
+"#
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
