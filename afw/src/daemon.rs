@@ -6,6 +6,7 @@ use tokio::sync::{mpsc, Mutex};
 
 use afw_common::{EVENT_EXEC, EVENT_EXIT, PROTO_TCP, PROTO_UDP};
 
+use crate::block_log::BlockLogger;
 use crate::config::Config;
 use crate::ebpf_loader;
 use crate::ipc;
@@ -30,6 +31,9 @@ pub async fn run() -> Result<()> {
         config.base.loopback,
     )
     .context("Failed to initialize nftables")?;
+
+    let block_logger = BlockLogger::new();
+    block_logger.init();
 
     let mut state = AppState::new(config.clone());
     state.scan_existing_processes()?;
@@ -112,6 +116,9 @@ pub async fn run() -> Result<()> {
                         summary.dest_addrs.len(),
                     );
                     info!("  To allow: {}", summary.suggested_command());
+
+                    // Write to rotating block log file
+                    block_logger.log_blocked(&summary);
 
                     // Spawn notification in background so action buttons
                     // don't block the daemon event loop

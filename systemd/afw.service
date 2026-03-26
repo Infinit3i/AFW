@@ -21,7 +21,8 @@ AmbientCapabilities=CAP_NET_ADMIN CAP_BPF CAP_PERFMON CAP_SYS_RESOURCE
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/run/afw
+ReadWritePaths=/run/afw /var/log/afw
+LogsDirectory=afw
 ConfigurationDirectory=afw
 PrivateTmp=yes
 

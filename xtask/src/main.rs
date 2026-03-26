@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::path::PathBuf;
 use std::process::Command;
 
 #[derive(Parser)]
@@ -11,6 +12,27 @@ enum Cli {
     },
 }
 
+fn find_rustup() -> PathBuf {
+    // Try PATH first
+    if let Ok(output) = Command::new("which").arg("rustup").output() {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return PathBuf::from(path);
+            }
+        }
+    }
+    // Fall back to ~/.cargo/bin/rustup
+    if let Some(home) = std::env::var_os("HOME") {
+        let candidate = PathBuf::from(home).join(".cargo/bin/rustup");
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    // Last resort
+    PathBuf::from("rustup")
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -20,12 +42,15 @@ fn main() {
 }
 
 fn build_ebpf(release: bool) {
-    let mut cmd = Command::new("cargo");
+    let rustup = find_rustup();
+    let mut cmd = Command::new(&rustup);
     cmd.current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/../afw-ebpf"));
 
     cmd.env_remove("RUSTUP_TOOLCHAIN");
     cmd.args([
-        "+nightly",
+        "run",
+        "nightly",
+        "cargo",
         "build",
         "--target=bpfel-unknown-none",
         "-Z",
@@ -38,7 +63,10 @@ fn build_ebpf(release: bool) {
 
     let status = cmd
         .status()
-        .expect("Failed to build eBPF programs. Is nightly toolchain installed?");
+        .unwrap_or_else(|e| panic!(
+            "Failed to run rustup at {:?}: {}. Is rustup installed and in PATH?",
+            rustup, e
+        ));
 
     if !status.success() {
         eprintln!("eBPF build failed");

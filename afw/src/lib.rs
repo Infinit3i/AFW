@@ -1,4 +1,5 @@
 pub mod banner;
+pub mod block_log;
 pub mod cli;
 pub mod config;
 pub mod daemon;
